@@ -1,9 +1,9 @@
 use std::{
     cmp::{min, Reverse},
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use uuid::Uuid;
 
 type Price = i64;
@@ -93,8 +93,8 @@ struct Trade {
 /// Map to reresents bids and asks
 /// bids desc (first/highest is best buy price), asks asc (first/lowest is best sell price)
 struct Orderbook {
-    asks: BTreeMap<Price, Vec<Order>>,
-    bids: BTreeMap<Reverse<Price>, Vec<Order>>,
+    asks: BTreeMap<Price, VecDeque<Order>>,
+    bids: BTreeMap<Reverse<Price>, VecDeque<Order>>,
     // he includes unordered map of order id -> order (entry) idk the point
 }
 
@@ -112,7 +112,24 @@ impl Orderbook {
         }
     }
 
-    fn match_orders(&mut self) -> Vec<Trade> {
+    fn process_trade(bid: &mut Order, ask: &mut Order) -> Result<Option<Trade>> {
+        if ask.price > bid.price {
+            return Ok(None);
+        }
+
+        let quantity = min(ask.remaining_quantity, bid.remaining_quantity);
+        bid.fill(quantity)?;
+        ask.fill(quantity)?;
+
+        let trade = Trade {
+            bid: (*bid, quantity).into(),
+            ask: (*ask, quantity).into(),
+        };
+
+        Ok(Some(trade))
+    }
+
+    fn match_orders(&mut self) -> Result<Vec<Trade>> {
         let mut trades = vec![];
 
         loop {
@@ -122,43 +139,36 @@ impl Orderbook {
 
             match (self.asks.first_entry(), self.bids.first_entry()) {
                 (Some(mut asks_entry), Some(mut bids_entry)) => {
-                    let asks = asks_entry.get_mut();
                     let bids = bids_entry.get_mut();
+                    let asks = asks_entry.get_mut();
+                    let bid = bids.get_mut(0).context("Should have first")?;
+                    let ask = asks.get_mut(0).context("Should have first")?;
 
-                    let ask = asks.get_mut(0).unwrap();
-                    let bid = bids.get_mut(0).unwrap();
+                    match Orderbook::process_trade(bid, ask)? {
+                        Some(trade) => trades.push(trade),
+                        None => break,
+                    }
 
-                    let quantity = min(ask.remaining_quantity, bid.remaining_quantity);
-                    let _ = bid.fill(quantity);
-                    let _ = ask.fill(quantity);
-
+                    // if bid or ask completely filled, remove it
                     if bid.remaining_quantity == 0 {
-                        let _ = bids.remove(0);
+                        let _ = bids.pop_front();
                     }
-
                     if ask.remaining_quantity == 0 {
-                        let _ = asks.remove(0);
+                        let _ = asks.pop_front();
                     }
 
-                    // if !bids.is_empty() {
-                    //     self.bids.remove(bids_entry.key());
-                    // }
-
-                    // if !asks.is_empty() {
-                    //     self.asks.remove(asks_entry.key());
-                    // }
-
-                    trades.push(Trade {
-                        bid: (*bid, quantity).into(),
-                        ask: (*ask, quantity).into(),
-                    });
-
-                    todo!()
+                    // if not more bids or asks at currently level, remove level
+                    if bids.is_empty() {
+                        let _ = bids_entry.remove_entry();
+                    }
+                    if asks.is_empty() {
+                        let _ = asks_entry.remove_entry();
+                    }
                 }
                 _ => break,
             }
         }
 
-        trades
+        Ok(trades)
     }
 }
