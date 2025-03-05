@@ -32,6 +32,17 @@ struct Order {
 }
 
 impl Order {
+    pub fn new(type_: OrderType, side: OrderSide, price: Price, quantity: Quantity) -> Self {
+        Self {
+            type_,
+            id: Uuid::new_v4(),
+            side,
+            price,
+            initial_quantity: quantity,
+            remaining_quantity: quantity,
+        }
+    }
+
     fn get_filled_quantity(&self) -> Quantity {
         self.initial_quantity - self.remaining_quantity
     }
