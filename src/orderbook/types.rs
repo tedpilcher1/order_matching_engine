@@ -285,4 +285,27 @@ mod tests {
 
         assert_empty_orderbook(&orderbook)
     }
+
+    #[test]
+    fn partial_order_match() {
+        let mut orderbook = Orderbook::new();
+        let price = 10;
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 5);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 10);
+
+        let first_trades = orderbook.add_order(buy_order).unwrap();
+        let second_trades = orderbook.add_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+
+        let trade = second_trades.first().unwrap();
+        assert_eq!(trade.ask.price, price);
+        assert_eq!(trade.ask.quantity, 5);
+
+        assert_eq!(trade.bid.price, price);
+        assert_eq!(trade.bid.quantity, 5);
+
+        assert!(orderbook.bids.is_empty());
+        assert!(!orderbook.asks.is_empty());
+    }
 }
