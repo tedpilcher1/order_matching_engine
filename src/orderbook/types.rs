@@ -98,15 +98,41 @@ struct Orderbook {
     orders: HashMap<Uuid, Order>,
 }
 
+// TODO: Check if can match before running matching algorithm
 impl Orderbook {
-    fn can_match(&mut self, side: OrderSide, price: Price) -> bool {
+    pub fn add_order(&mut self, order: Order) -> Result<Vec<Trade>> {
+        if self.orders.contains_key(&order.id) {
+            return Err(anyhow!("Order id already exists "));
+        }
+
+        match &order.side {
+            OrderSide::Buy => {
+                self.bids
+                    .entry(Reverse(order.price))
+                    .or_insert_with(VecDeque::new)
+                    .push_back(order);
+            }
+            OrderSide::Sell => {
+                self.asks
+                    .entry(order.price)
+                    .or_insert_with(VecDeque::new)
+                    .push_back(order);
+            }
+        }
+
+        self.orders.insert(order.id, order);
+
+        self.match_orders()
+    }
+
+    fn can_match(&mut self, side: &OrderSide, price: &Price) -> bool {
         match side {
             OrderSide::Buy => match self.asks.first_key_value() {
-                Some((best_ask, _)) => price >= *best_ask,
+                Some((best_ask, _)) => price >= best_ask,
                 None => false,
             },
             OrderSide::Sell => match self.bids.first_key_value() {
-                Some((best_bid, _)) => price <= best_bid.0,
+                Some((Reverse(best_bid), _)) => price <= best_bid,
                 None => false,
             },
         }
