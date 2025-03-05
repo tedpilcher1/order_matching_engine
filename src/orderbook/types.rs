@@ -100,6 +100,14 @@ struct Orderbook {
 
 // TODO: Check if can match before running matching algorithm
 impl Orderbook {
+    pub fn new() -> Self {
+        Self {
+            asks: BTreeMap::new(),
+            bids: BTreeMap::new(),
+            orders: HashMap::new(),
+        }
+    }
+
     pub fn cancel_order(&mut self, order: Order) -> Result<bool> {
         match self.orders.remove(&order.id) {
             Some(order) => match &order.side {
