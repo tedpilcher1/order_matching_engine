@@ -252,3 +252,37 @@ impl Orderbook {
         Ok(trades)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_empty_orderbook(orderbook: &Orderbook) {
+        assert!(orderbook.bids.is_empty());
+        assert!(orderbook.asks.is_empty())
+    }
+
+    #[test]
+    fn basic_order_match() {
+        let mut orderbook = Orderbook::new();
+        let price = 10;
+        let quantity = 1;
+
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, quantity);
+
+        let first_trades = orderbook.add_order(buy_order).unwrap();
+        let second_trades = orderbook.add_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+
+        let trade = second_trades.first().unwrap();
+        assert_eq!(trade.ask.price, price);
+        assert_eq!(trade.ask.quantity, quantity);
+
+        assert_eq!(trade.bid.price, price);
+        assert_eq!(trade.bid.quantity, quantity);
+
+        assert_empty_orderbook(&orderbook)
+    }
+}
