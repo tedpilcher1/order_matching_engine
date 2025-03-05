@@ -21,7 +21,7 @@ struct OrderbookLevelInfo {
     asks: Vec<LevelInfo>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 struct Order {
     type_: OrderType,
     pub id: Uuid,
@@ -49,7 +49,7 @@ impl Order {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 
 enum OrderType {}
 
@@ -100,6 +100,35 @@ struct Orderbook {
 
 // TODO: Check if can match before running matching algorithm
 impl Orderbook {
+    pub fn cancel_order(&mut self, order: Order) -> Result<bool> {
+        match self.orders.remove(&order.id) {
+            Some(order) => match &order.side {
+                OrderSide::Buy => {
+                    if let Some(bids) = self.bids.get_mut(&Reverse(order.price)) {
+                        bids.retain(|&x| x != order);
+                        if bids.is_empty() {
+                            self.bids.remove(&Reverse(order.price));
+                        }
+                    }
+
+                    Ok(true)
+                }
+                OrderSide::Sell => {
+                    if let Some(asks) = self.asks.get_mut(&order.price) {
+                        asks.retain(|&x| x != order);
+
+                        if asks.is_empty() {
+                            self.asks.remove(&order.price);
+                        }
+                    }
+
+                    Ok(true)
+                }
+            },
+            None => Ok(false),
+        }
+    }
+
     pub fn add_order(&mut self, order: Order) -> Result<Vec<Trade>> {
         if self.orders.contains_key(&order.id) {
             return Err(anyhow!("Order id already exists "));
