@@ -1,6 +1,6 @@
 use std::{
     cmp::{min, Reverse},
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -95,7 +95,7 @@ struct Trade {
 struct Orderbook {
     asks: BTreeMap<Price, VecDeque<Order>>,
     bids: BTreeMap<Reverse<Price>, VecDeque<Order>>,
-    // he includes unordered map of order id -> order (entry) idk the point
+    orders: HashMap<Uuid, Order>,
 }
 
 impl Orderbook {
@@ -151,9 +151,11 @@ impl Orderbook {
 
                     // if bid or ask completely filled, remove it
                     if bid.remaining_quantity == 0 {
+                        self.orders.remove(&bid.id);
                         let _ = bids.pop_front();
                     }
                     if ask.remaining_quantity == 0 {
+                        self.orders.remove(&ask.id);
                         let _ = asks.pop_front();
                     }
 
