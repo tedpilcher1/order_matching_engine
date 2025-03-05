@@ -21,7 +21,7 @@ struct OrderbookLevelInfo {
     asks: Vec<LevelInfo>,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 struct Order {
     type_: OrderType,
     pub id: Uuid,
@@ -60,11 +60,12 @@ impl Order {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
+enum OrderType {
+    Normal,
+}
 
-enum OrderType {}
-
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum OrderSide {
     Buy,
     Sell,
@@ -77,6 +78,7 @@ struct OrderModify {
     quantity: Quantity,
 }
 
+#[derive(Debug)]
 struct TradeInfo {
     order_id: Uuid,
     price: Price,
@@ -96,6 +98,7 @@ impl From<(Order, Quantity)> for TradeInfo {
 }
 
 /// matched order, aggregate of bid and ask
+#[derive(Debug)]
 struct Trade {
     bid: TradeInfo,
     ask: TradeInfo,
@@ -103,6 +106,7 @@ struct Trade {
 
 /// Map to reresents bids and asks
 /// bids desc (first/highest is best buy price), asks asc (first/lowest is best sell price)
+#[derive(Debug)]
 struct Orderbook {
     asks: BTreeMap<Price, VecDeque<Order>>,
     bids: BTreeMap<Reverse<Price>, VecDeque<Order>>,
