@@ -4,7 +4,10 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
+use chrono::Utc;
 use uuid::Uuid;
+
+use crate::metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER};
 
 type Price = i64;
 type Quantity = u64;
@@ -153,6 +156,9 @@ impl Orderbook {
     }
 
     pub fn add_order(&mut self, order: Order) -> Result<Vec<Trade>> {
+        ORDER_COUNTER.inc();
+        let start_time = Utc::now();
+
         if self.orders.contains_key(&order.id) {
             return Err(anyhow!("Order id already exists "));
         }
@@ -174,7 +180,13 @@ impl Orderbook {
 
         self.orders.insert(order.id, order);
 
-        self.match_orders()
+        let res = self.match_orders();
+
+        let end_time = Utc::now();
+
+        MATCHING_DURATION.observe((end_time - start_time).num_seconds() as f64);
+
+        res
     }
 
     fn can_match(&mut self, side: &OrderSide, price: &Price) -> bool {
@@ -203,6 +215,8 @@ impl Orderbook {
             bid: (*bid, quantity).into(),
             ask: (*ask, quantity).into(),
         };
+
+        TRADE_COUNTER.inc();
 
         Ok(Some(trade))
     }
