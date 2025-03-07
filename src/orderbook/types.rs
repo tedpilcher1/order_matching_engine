@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER};
@@ -25,13 +26,13 @@ struct OrderbookLevelInfo {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-struct Order {
-    type_: OrderType,
+pub struct Order {
+    pub type_: OrderType,
     pub id: Uuid,
-    side: OrderSide,
+    pub side: OrderSide,
     pub price: Price,
-    initial_quantity: Quantity,
-    remaining_quantity: Quantity,
+    pub initial_quantity: Quantity,
+    pub remaining_quantity: Quantity,
 }
 
 impl Order {
@@ -63,13 +64,13 @@ impl Order {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
-enum OrderType {
+#[derive(Copy, Clone, PartialEq, Debug, Deserialize)]
+pub enum OrderType {
     Normal,
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
-enum OrderSide {
+#[derive(PartialEq, Clone, Copy, Debug, Deserialize)]
+pub enum OrderSide {
     Buy,
     Sell,
 }
@@ -102,7 +103,7 @@ impl From<(Order, Quantity)> for TradeInfo {
 
 /// matched order, aggregate of bid and ask
 #[derive(Debug)]
-struct Trade {
+pub struct Trade {
     bid: TradeInfo,
     ask: TradeInfo,
 }
@@ -110,7 +111,7 @@ struct Trade {
 /// Map to reresents bids and asks
 /// bids desc (first/highest is best buy price), asks asc (first/lowest is best sell price)
 #[derive(Debug)]
-struct Orderbook {
+pub struct Orderbook {
     asks: BTreeMap<Price, VecDeque<Order>>,
     bids: BTreeMap<Reverse<Price>, VecDeque<Order>>,
     orders: HashMap<Uuid, Order>,
@@ -186,6 +187,8 @@ impl Orderbook {
 
         MATCHING_DURATION.observe((end_time - start_time).num_seconds() as f64);
 
+        println!("ADDED ORDER");
+
         res
     }
 
@@ -217,6 +220,7 @@ impl Orderbook {
         };
 
         TRADE_COUNTER.inc();
+        println!("PROCESSED TRADE");
 
         Ok(Some(trade))
     }
