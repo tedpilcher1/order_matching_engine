@@ -33,7 +33,42 @@ impl Orderbook {
         }
     }
 
-    pub fn cancel_order(&mut self, order_id: Uuid) -> Result<bool> {
+    /// Modifies an order
+    ///
+    /// Cannot modify an order to a new type or side
+    ///
+    /// Doesn't modify in place, cancels, and adds new order
+    ///
+    /// Quantity of new order is abs(modified_new_order - old_order)
+    pub fn modify_order(&mut self, order: Order) -> Result<()> {
+        // Can't modify order to new type or side
+        if let Some(existing_order) = self.orders.get(&order.id) {
+            if order.side != existing_order.side || order.type_ != existing_order.type_ {
+                return Ok(());
+            }
+        }
+
+        if let Ok(Some(existing_order)) = self.cancel_order(order.id) {
+            let remaining_quantity = order
+                .remaining_quantity
+                .abs_diff(existing_order.remaining_quantity);
+
+            let fresh_order = Order {
+                type_: order.type_,
+                id: order.id,
+                side: order.side,
+                price: order.price,
+                initial_quantity: remaining_quantity,
+                remaining_quantity,
+            };
+
+            let _ = self.add_order(fresh_order);
+        }
+
+        Ok(())
+    }
+
+    pub fn cancel_order(&mut self, order_id: Uuid) -> Result<Option<Order>> {
         match self.orders.remove(&order_id) {
             Some(order) => match &order.side {
                 OrderSide::Buy => {
@@ -44,7 +79,7 @@ impl Orderbook {
                         }
                     }
 
-                    Ok(true)
+                    Ok(Some(order))
                 }
                 OrderSide::Sell => {
                     if let Some(asks) = self.asks.get_mut(&order.price) {
@@ -55,10 +90,10 @@ impl Orderbook {
                         }
                     }
 
-                    Ok(true)
+                    Ok(Some(order))
                 }
             },
-            None => Ok(false),
+            None => Ok(None),
         }
     }
 
