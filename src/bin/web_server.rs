@@ -1,64 +1,16 @@
 use std::sync::Mutex;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpServer};
 use matching_engine::{
-    metrics::{register_custom_metrics, REGISTRY},
-    orderbook::orderbook::{Order, Orderbook},
-    web_server::types::OrderRequest,
+    metrics::register_custom_metrics,
+    orderbook::orderbook::Orderbook,
+    web_server::{
+        endpoints::{cancel_order_endpoint, create_order_endpoint, metrics_endpoint},
+        types::OrderbookMutex,
+    },
 };
-use prometheus::{Encoder, TextEncoder};
-use uuid::Uuid;
 
-struct OrderbookMutex {
-    orderbook: Mutex<Orderbook>,
-}
-
-#[post("/cancel_order{order_id}")]
-async fn cancel_order_endpoint(
-    order_id: web::Path<Uuid>,
-    orderbook: web::Data<OrderbookMutex>,
-) -> impl Responder {
-    let mut orderbook = match orderbook.orderbook.lock() {
-        Ok(orderbook) => orderbook,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
-
-    match orderbook.cancel_order(*order_id) {
-        Ok(cancelled) => HttpResponse::Ok().json(cancelled),
-        Err(_) => HttpResponse::InternalServerError().finish(),
-    }
-}
-
-#[post("/create_order")]
-async fn create_order_endpoint(
-    order: web::Json<OrderRequest>,
-    orderbook: web::Data<OrderbookMutex>,
-) -> impl Responder {
-    let mut orderbook = match orderbook.orderbook.lock() {
-        Ok(orderbook) => orderbook,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
-
-    let order: Order = order.into_inner().into();
-    match orderbook.add_order(order) {
-        Ok(_) => HttpResponse::Ok().finish(),
-        Err(_) => HttpResponse::InternalServerError().finish(),
-    }
-}
-
-#[get("/metrics")]
-async fn metrics_endpoint() -> impl Responder {
-    let encoder = TextEncoder::new();
-    let metric_families = REGISTRY.gather();
-    let mut buffer = vec![];
-    encoder.encode(&metric_families, &mut buffer).unwrap();
-
-    HttpResponse::Ok()
-        .content_type("text/plain; version=0.0.4")
-        .body(buffer)
-}
-
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> std::io::Result<()> {
     register_custom_metrics();
 

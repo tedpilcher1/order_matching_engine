@@ -1,7 +1,9 @@
+use std::sync::Mutex;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::orderbook::orderbook::{Order, OrderSide, OrderType};
+use crate::orderbook::orderbook::{Order, OrderSide, OrderType, Orderbook};
 
 type Price = i64;
 type Quantity = u64;
@@ -25,4 +27,8 @@ impl From<OrderRequest> for Order {
             remaining_quantity: order_request.quantity,
         }
     }
+}
+
+pub struct OrderbookMutex {
+    pub orderbook: Mutex<Orderbook>,
 }
