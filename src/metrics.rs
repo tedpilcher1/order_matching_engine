@@ -3,6 +3,8 @@ use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter
 
 lazy_static! {
     pub static ref REGISTRY: Registry = Registry::new();
+    pub static ref REQUESTS_COUNTER: IntCounter =
+        register_int_counter!("requests_counter", "Number of requests recieved").unwrap();
     pub static ref BUY_ORDER_PRICE: Histogram =
         register_histogram!("buy_order_price", "Buy order price").unwrap();
     pub static ref SELL_ORDER_PRICE: Histogram =
@@ -21,6 +23,9 @@ lazy_static! {
 }
 
 pub fn register_custom_metrics() {
+    REGISTRY
+        .register(Box::new(REQUESTS_COUNTER.clone()))
+        .expect("collector can be registered");
     REGISTRY
         .register(Box::new(SELL_ORDER_PRICE.clone()))
         .expect("collector can be registered");
