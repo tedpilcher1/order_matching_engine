@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER};
@@ -64,12 +64,12 @@ impl Order {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub enum OrderType {
     Normal,
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Deserialize)]
+#[derive(PartialEq, Clone, Copy, Debug, Deserialize, Serialize)]
 pub enum OrderSide {
     Buy,
     Sell,
@@ -187,7 +187,7 @@ impl Orderbook {
 
         MATCHING_DURATION.observe((end_time - start_time).num_seconds() as f64);
 
-        println!("ADDED ORDER");
+        // println!("ADDED ORDER");
 
         res
     }
@@ -220,7 +220,7 @@ impl Orderbook {
         };
 
         TRADE_COUNTER.inc();
-        println!("PROCESSED TRADE");
+        // println!("PROCESSED TRADE");
 
         Ok(Some(trade))
     }
