@@ -70,6 +70,7 @@ impl Order {
 #[derive(Copy, Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub enum OrderType {
     Normal,
+    FillOrKill,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Deserialize, Serialize)]
@@ -204,7 +205,9 @@ impl Orderbook {
 
         MATCHING_DURATION.observe((end_time - start_time).num_seconds() as f64);
 
-        // println!("ADDED ORDER");
+        if order.type_ == OrderType::FillOrKill {
+            let _ = self.cancel_order(order.id)?;
+        }
 
         res
     }
@@ -237,7 +240,6 @@ impl Orderbook {
         };
 
         TRADE_COUNTER.inc();
-        // println!("PROCESSED TRADE");
 
         Ok(Some(trade))
     }
