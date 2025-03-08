@@ -3,13 +3,30 @@ use std::sync::Mutex;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use matching_engine::{
     metrics::{register_custom_metrics, REGISTRY},
-    orderbook::types::{Order, Orderbook},
+    orderbook::orderbook::{Order, Orderbook},
     web_server::types::OrderRequest,
 };
 use prometheus::{Encoder, TextEncoder};
+use uuid::Uuid;
 
 struct OrderbookMutex {
     orderbook: Mutex<Orderbook>,
+}
+
+#[post("/cancel_order{order_id}")]
+async fn cancel_order_endpoint(
+    order_id: web::Path<Uuid>,
+    orderbook: web::Data<OrderbookMutex>,
+) -> impl Responder {
+    let mut orderbook = match orderbook.orderbook.lock() {
+        Ok(orderbook) => orderbook,
+        Err(_) => return HttpResponse::InternalServerError().finish(),
+    };
+
+    match orderbook.cancel_order(*order_id) {
+        Ok(cancelled) => HttpResponse::Ok().json(cancelled),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
 }
 
 #[post("/create_order")]
@@ -56,6 +73,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(app_data.clone())
             .service(metrics_endpoint)
             .service(create_order_endpoint)
+            .service(cancel_order_endpoint)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
