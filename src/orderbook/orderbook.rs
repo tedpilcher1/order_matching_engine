@@ -294,6 +294,8 @@ impl Orderbook {
 
 #[cfg(test)]
 mod tests {
+    use crate::orderbook;
+
     use super::*;
 
     fn assert_empty_orderbook(orderbook: &Orderbook) {
@@ -346,5 +348,17 @@ mod tests {
 
         assert!(orderbook.bids.is_empty());
         assert!(!orderbook.asks.is_empty());
+    }
+
+    #[test]
+    fn fill_or_kill_order() {
+        let mut orderbook = Orderbook::new();
+        let order = Order::new(OrderType::FillOrKill, OrderSide::Buy, 1, 1);
+
+        let trades = orderbook.add_order(order).unwrap();
+
+        assert!(trades.is_empty());
+
+        assert_empty_orderbook(&orderbook)
     }
 }
