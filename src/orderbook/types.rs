@@ -8,7 +8,10 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::metrics::{MATCHING_DURATION, ORDERS_FILLED_COUNTER, ORDER_COUNTER, TRADE_COUNTER};
+use crate::metrics::{
+    BUY_ORDER_PRICE, MATCHING_DURATION, ORDERS_FILLED_COUNTER, ORDER_COUNTER, SELL_ORDER_PRICE,
+    TRADE_COUNTER,
+};
 
 type Price = i64;
 type Quantity = u64;
@@ -158,6 +161,20 @@ impl Orderbook {
 
     pub fn add_order(&mut self, order: Order) -> Result<Vec<Trade>> {
         ORDER_COUNTER.inc();
+
+        match order.side {
+            OrderSide::Buy => {
+                for _ in 0..order.initial_quantity {
+                    BUY_ORDER_PRICE.observe(order.price as f64);
+                }
+            }
+            OrderSide::Sell => {
+                for _ in 0..order.initial_quantity {
+                    SELL_ORDER_PRICE.observe(order.price as f64);
+                }
+            }
+        }
+
         let start_time = Utc::now();
 
         if self.orders.contains_key(&order.id) {
