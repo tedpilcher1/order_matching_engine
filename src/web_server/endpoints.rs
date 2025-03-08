@@ -5,16 +5,19 @@ use uuid::Uuid;
 
 use crate::{
     metrics::{REGISTRY, REQUESTS_COUNTER},
-    web_server::types::{AppState, OrderRequest},
+    web_server::types::{AppState, OrderRequest, TradeRequest},
 };
 
 #[post("/modify_order")]
 async fn modify_order_endpoint(
-    order_request: web::Json<OrderRequest>,
+    order_request: web::Json<TradeRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     REQUESTS_COUNTER.inc();
-    match state.sender.send(order_request.into_inner().into()) {
+    match state
+        .sender
+        .send(OrderRequest::Modify(order_request.into_inner().into()))
+    {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
@@ -38,11 +41,14 @@ async fn cancel_order_endpoint(
 
 #[post("/create_order")]
 async fn create_order_endpoint(
-    order_request: web::Json<OrderRequest>,
+    order_request: web::Json<TradeRequest>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     REQUESTS_COUNTER.inc();
-    match state.sender.send(order_request.into_inner().into()) {
+    match state
+        .sender
+        .send(OrderRequest::Trade(order_request.into_inner().into()))
+    {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
