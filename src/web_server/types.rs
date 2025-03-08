@@ -1,9 +1,7 @@
-use std::sync::Mutex;
-
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::orderbook::orderbook::{Order, OrderSide, OrderType, Orderbook};
+use crate::orderbook::orderbook::{Order, OrderSide, OrderType};
 
 type Price = i64;
 type Quantity = u64;
@@ -29,6 +27,6 @@ impl From<OrderRequest> for Order {
     }
 }
 
-pub struct OrderbookMutex {
-    pub orderbook: Mutex<Orderbook>,
+pub struct AppState {
+    pub sender: crossbeam::channel::Sender<Order>,
 }
