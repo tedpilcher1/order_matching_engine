@@ -130,8 +130,8 @@ impl Orderbook {
         }
     }
 
-    pub fn cancel_order(&mut self, order: Order) -> Result<bool> {
-        match self.orders.remove(&order.id) {
+    pub fn cancel_order(&mut self, order_id: Uuid) -> Result<bool> {
+        match self.orders.remove(&order_id) {
             Some(order) => match &order.side {
                 OrderSide::Buy => {
                     if let Some(bids) = self.bids.get_mut(&Reverse(order.price)) {
