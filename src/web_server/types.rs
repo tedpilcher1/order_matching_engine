@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::orderbook::types::{Order, OrderSide, OrderType};
+use crate::orderbook::orderbook::{Order, OrderSide, OrderType};
 
 type Price = i64;
 type Quantity = u64;
