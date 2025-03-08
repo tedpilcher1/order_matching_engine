@@ -1,31 +1,44 @@
-use std::sync::Mutex;
+use std::thread;
 
 use actix_web::{web, App, HttpServer};
+use crossbeam::channel;
 use matching_engine::{
     metrics::register_custom_metrics,
-    orderbook::orderbook::Orderbook,
+    orderbook::orderbook::{Order, Orderbook},
     web_server::{
-        endpoints::{cancel_order_endpoint, create_order_endpoint, metrics_endpoint},
-        types::OrderbookMutex,
+        endpoints::{create_order_endpoint, metrics_endpoint},
+        types::AppState,
     },
 };
 
-#[tokio::main]
+fn worker_thread(receiver: crossbeam::channel::Receiver<Order>) {
+    let mut orderbook = Orderbook::new();
+
+    loop {
+        if let Ok(order) = receiver.recv() {
+            let _ = orderbook.add_order(order);
+        }
+    }
+}
+
+#[actix_web::main]
 async fn main() -> std::io::Result<()> {
     register_custom_metrics();
 
-    let orderbook = OrderbookMutex {
-        orderbook: Mutex::new(Orderbook::new()),
-    };
+    let (sender, receiver) = channel::unbounded();
 
-    let app_data = web::Data::new(orderbook);
+    thread::spawn(move || {
+        worker_thread(receiver);
+    });
+
+    let state = web::Data::new(AppState { sender });
 
     HttpServer::new(move || {
         App::new()
-            .app_data(app_data.clone())
+            .app_data(state.clone())
             .service(metrics_endpoint)
             .service(create_order_endpoint)
-            .service(cancel_order_endpoint)
+        // .service(cancel_order_endpoint)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
