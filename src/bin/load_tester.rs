@@ -1,5 +1,5 @@
 use goose::prelude::*;
-use matching_engine::orderbook::orderbook::{OrderSide, OrderType};
+use matching_engine::orderbook::{OrderSide, OrderType};
 
 async fn add_order(user: &mut GooseUser) -> TransactionResult {
     let order_side = if rand::random_bool(0.5) {

@@ -4,7 +4,7 @@ use actix_web::{web, App, HttpServer};
 use crossbeam::channel;
 use matching_engine::{
     metrics::register_custom_metrics,
-    orderbook::orderbook::{Order, Orderbook},
+    orderbook::{orderbook::Orderbook, Order},
     web_server::{
         endpoints::{create_order_endpoint, metrics_endpoint},
         types::AppState,
