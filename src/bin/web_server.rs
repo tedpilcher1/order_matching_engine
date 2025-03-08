@@ -6,7 +6,9 @@ use matching_engine::{
     metrics::register_custom_metrics,
     orderbook::orderbook::Orderbook,
     web_server::{
-        endpoints::{cancel_order_endpoint, create_order_endpoint, metrics_endpoint},
+        endpoints::{
+            cancel_order_endpoint, create_order_endpoint, metrics_endpoint, modify_order_endpoint,
+        },
         types::{AppState, OrderRequest},
     },
 };
@@ -22,6 +24,9 @@ fn worker_thread(receiver: Receiver<OrderRequest>) {
                 }
                 OrderRequest::Cancel(order_id) => {
                     let _ = orderbook.cancel_order(order_id);
+                }
+                OrderRequest::Modify(trade_request) => {
+                    let _ = orderbook.modify_order(trade_request.into());
                 }
             }
         }
@@ -46,6 +51,7 @@ async fn main() -> std::io::Result<()> {
             .service(metrics_endpoint)
             .service(create_order_endpoint)
             .service(cancel_order_endpoint)
+            .service(modify_order_endpoint)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

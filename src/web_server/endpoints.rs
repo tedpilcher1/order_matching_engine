@@ -8,6 +8,18 @@ use crate::{
     web_server::types::{AppState, OrderRequest},
 };
 
+#[post("/modify_order")]
+async fn modify_order_endpoint(
+    order_request: web::Json<OrderRequest>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    REQUESTS_COUNTER.inc();
+    match state.sender.send(order_request.into_inner().into()) {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
 #[post("/cancel_order{order_id}")]
 async fn cancel_order_endpoint(
     order_id: web::Path<Uuid>,
