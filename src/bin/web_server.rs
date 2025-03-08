@@ -1,36 +1,15 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
-use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
-use matching_engine::orderbook::types::{Order, OrderSide, OrderType, Orderbook};
-use serde::Deserialize;
-use uuid::Uuid;
-
-type Price = i64;
-type Quantity = u64;
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use matching_engine::{
+    metrics::{register_custom_metrics, REGISTRY},
+    orderbook::types::{Order, Orderbook},
+    web_server::types::OrderRequest,
+};
+use prometheus::{Encoder, TextEncoder};
 
 struct OrderbookMutex {
     orderbook: Mutex<Orderbook>,
-}
-
-#[derive(Deserialize)]
-pub struct OrderRequest {
-    order_type: OrderType,
-    order_side: OrderSide,
-    price: Price,
-    quantity: Quantity,
-}
-
-impl From<OrderRequest> for Order {
-    fn from(order_request: OrderRequest) -> Self {
-        Order {
-            type_: OrderType::Normal,
-            id: Uuid::new_v4(),
-            side: order_request.order_side,
-            price: order_request.price,
-            initial_quantity: order_request.quantity,
-            remaining_quantity: order_request.quantity,
-        }
-    }
 }
 
 #[post("/create_order")]
@@ -50,8 +29,22 @@ async fn create_order_endpoint(
     }
 }
 
+#[get("/metrics")]
+async fn metrics_endpoint() -> impl Responder {
+    let encoder = TextEncoder::new();
+    let metric_families = REGISTRY.gather();
+    let mut buffer = vec![];
+    encoder.encode(&metric_families, &mut buffer).unwrap();
+
+    HttpResponse::Ok()
+        .content_type("text/plain; version=0.0.4")
+        .body(buffer)
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    register_custom_metrics();
+
     let orderbook = OrderbookMutex {
         orderbook: Mutex::new(Orderbook::new()),
     };
@@ -61,6 +54,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(app_data.clone())
+            .service(metrics_endpoint)
             .service(create_order_endpoint)
     })
     .bind(("127.0.0.1", 8080))?
