@@ -8,7 +8,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER};
+use crate::metrics::{MATCHING_DURATION, ORDERS_FILLED_COUNTER, ORDER_COUNTER, TRADE_COUNTER};
 
 type Price = i64;
 type Quantity = u64;
@@ -247,10 +247,12 @@ impl Orderbook {
 
                     // if bid or ask completely filled, remove it
                     if bid.remaining_quantity == 0 {
+                        ORDERS_FILLED_COUNTER.inc();
                         self.orders.remove(&bid.id);
                         let _ = bids.pop_front();
                     }
                     if ask.remaining_quantity == 0 {
+                        ORDERS_FILLED_COUNTER.inc();
                         self.orders.remove(&ask.id);
                         let _ = asks.pop_front();
                     }
