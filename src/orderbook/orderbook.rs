@@ -18,17 +18,19 @@ use super::{Order, OrderSide, OrderType, Price, Trade};
 /// bids desc (first/highest is best buy price), asks asc (first/lowest is best sell price)
 #[derive(Debug)]
 pub struct Orderbook {
-    asks: BTreeMap<Price, VecDeque<Order>>,
-    bids: BTreeMap<Reverse<Price>, VecDeque<Order>>,
-    orders: HashMap<Uuid, Order>,
+    ask_levels: BTreeMap<Price, VecDeque<Uuid>>,
+    bid_levels: BTreeMap<Reverse<Price>, VecDeque<Uuid>>,
+    bid_orders: HashMap<Uuid, Order>,
+    ask_orders: HashMap<Uuid, Order>,
 }
 
 impl Orderbook {
     pub fn new() -> Self {
         Self {
-            asks: BTreeMap::new(),
-            bids: BTreeMap::new(),
-            orders: HashMap::new(),
+            ask_levels: BTreeMap::new(),
+            bid_levels: BTreeMap::new(),
+            bid_orders: HashMap::new(),
+            ask_orders: HashMap::new(),
         }
     }
 
@@ -40,60 +42,63 @@ impl Orderbook {
     ///
     /// Quantity of new order is abs(modified_new_order - old_order)
     pub fn modify_order(&mut self, order: Order) -> Result<()> {
-        // Can't modify order to new type or side
-        if let Some(existing_order) = self.orders.get(&order.id) {
-            if order.side != existing_order.side || order.type_ != existing_order.type_ {
-                return Ok(());
+        let existing_order = match &order.side {
+            OrderSide::Buy => self.bid_orders.get(&order.id),
+            OrderSide::Sell => self.ask_orders.get(&order.id),
+        };
+
+        match existing_order {
+            Some(existing_order) => {
+                if existing_order.type_ != order.type_ {
+                    return Ok(());
+                }
+
+                if let Ok(Some(cancelled_order)) = self.cancel_order(order.id) {
+                    let remaining_quantity = order
+                        .remaining_quantity
+                        .abs_diff(cancelled_order.remaining_quantity);
+
+                    let fresh_order = Order {
+                        type_: order.type_,
+                        id: order.id,
+                        side: order.side,
+                        price: order.price,
+                        initial_quantity: remaining_quantity,
+                        remaining_quantity,
+                    };
+
+                    let _ = self.add_order(fresh_order);
+                }
             }
-        }
-
-        if let Ok(Some(existing_order)) = self.cancel_order(order.id) {
-            let remaining_quantity = order
-                .remaining_quantity
-                .abs_diff(existing_order.remaining_quantity);
-
-            let fresh_order = Order {
-                type_: order.type_,
-                id: order.id,
-                side: order.side,
-                price: order.price,
-                initial_quantity: remaining_quantity,
-                remaining_quantity,
-            };
-
-            let _ = self.add_order(fresh_order);
+            // cannot modify side
+            None => return Ok(()),
         }
 
         Ok(())
     }
 
     pub fn cancel_order(&mut self, order_id: Uuid) -> Result<Option<Order>> {
-        match self.orders.remove(&order_id) {
-            Some(order) => match &order.side {
-                OrderSide::Buy => {
-                    if let Some(bids) = self.bids.get_mut(&Reverse(order.price)) {
-                        bids.retain(|&x| x != order);
-                        if bids.is_empty() {
-                            self.bids.remove(&Reverse(order.price));
-                        }
-                    }
-
-                    Ok(Some(order))
+        if let Some(order) = self.bid_orders.get(&order_id) {
+            if let Some(bid_levels) = self.bid_levels.get_mut(&Reverse(order.price)) {
+                bid_levels.retain(|&x| x != order.id);
+                if bid_levels.is_empty() {
+                    self.bid_levels.remove(&Reverse(order.price));
+                    return Ok(Some(*order));
                 }
-                OrderSide::Sell => {
-                    if let Some(asks) = self.asks.get_mut(&order.price) {
-                        asks.retain(|&x| x != order);
-
-                        if asks.is_empty() {
-                            self.asks.remove(&order.price);
-                        }
-                    }
-
-                    Ok(Some(order))
-                }
-            },
-            None => Ok(None),
+            }
         }
+
+        if let Some(order) = self.ask_orders.get(&order_id) {
+            if let Some(ask_levels) = self.ask_levels.get_mut(&order.price) {
+                ask_levels.retain(|&x| x != order.id);
+                if ask_levels.is_empty() {
+                    self.ask_levels.remove(&order.price);
+                    return Ok(Some(*order));
+                }
+            }
+        }
+
+        Ok(None)
     }
 
     pub fn add_order(&mut self, order: Order) -> Result<Vec<Trade>> {
@@ -112,26 +117,29 @@ impl Orderbook {
             }
         }
 
-        if self.orders.contains_key(&order.id) {
-            return Err(anyhow!("Order id already exists "));
-        }
-
         match &order.side {
             OrderSide::Buy => {
-                self.bids
+                if self.bid_orders.contains_key(&order.id) {
+                    return Err(anyhow!("Order id already exists "));
+                }
+
+                self.bid_levels
                     .entry(Reverse(order.price))
                     .or_insert_with(VecDeque::new)
-                    .push_back(order);
+                    .push_back(order.id);
+                self.bid_orders.insert(order.id, order);
             }
             OrderSide::Sell => {
-                self.asks
+                if self.ask_orders.contains_key(&order.id) {
+                    return Err(anyhow!("Order id already exists "));
+                }
+                self.ask_levels
                     .entry(order.price)
                     .or_insert_with(VecDeque::new)
-                    .push_back(order);
+                    .push_back(order.id);
+                self.ask_orders.insert(order.id, order);
             }
         }
-
-        self.orders.insert(order.id, order);
 
         let res = match self.can_match(&order.side, &order.price) {
             true => {
@@ -153,11 +161,11 @@ impl Orderbook {
 
     fn can_match(&mut self, side: &OrderSide, price: &Price) -> bool {
         match side {
-            OrderSide::Buy => match self.asks.first_key_value() {
+            OrderSide::Buy => match self.ask_levels.first_key_value() {
                 Some((best_ask, _)) => price >= best_ask,
                 None => false,
             },
-            OrderSide::Sell => match self.bids.first_key_value() {
+            OrderSide::Sell => match self.bid_levels.first_key_value() {
                 Some((Reverse(best_bid), _)) => price <= best_bid,
                 None => false,
             },
@@ -187,16 +195,24 @@ impl Orderbook {
         let mut trades = vec![];
 
         loop {
-            if self.asks.is_empty() || self.bids.is_empty() {
+            if self.ask_levels.is_empty() || self.bid_levels.is_empty() {
                 break;
             }
 
-            match (self.asks.first_entry(), self.bids.first_entry()) {
+            match (self.ask_levels.first_entry(), self.bid_levels.first_entry()) {
                 (Some(mut asks_entry), Some(mut bids_entry)) => {
                     let bids = bids_entry.get_mut();
                     let asks = asks_entry.get_mut();
-                    let bid = bids.get_mut(0).context("Should have first")?;
-                    let ask = asks.get_mut(0).context("Should have first")?;
+                    let bid_id = bids.get_mut(0).context("Should have first")?;
+                    let ask_id = asks.get_mut(0).context("Should have first")?;
+                    let bid = self
+                        .bid_orders
+                        .get_mut(&bid_id)
+                        .context("Bid should be stored")?;
+                    let ask = self
+                        .ask_orders
+                        .get_mut(&ask_id)
+                        .context("Ask should be stored")?;
 
                     match Orderbook::process_trade(bid, ask)? {
                         Some(trade) => trades.push(trade),
@@ -206,12 +222,12 @@ impl Orderbook {
                     // if bid or ask completely filled, remove it
                     if bid.remaining_quantity == 0 {
                         ORDERS_FILLED_COUNTER.inc();
-                        self.orders.remove(&bid.id);
+                        self.bid_orders.remove(&bid_id);
                         let _ = bids.pop_front();
                     }
                     if ask.remaining_quantity == 0 {
                         ORDERS_FILLED_COUNTER.inc();
-                        self.orders.remove(&ask.id);
+                        self.ask_orders.remove(ask_id);
                         let _ = asks.pop_front();
                     }
 
@@ -236,8 +252,8 @@ mod tests {
     use super::*;
 
     fn assert_empty_orderbook(orderbook: &Orderbook) {
-        assert!(orderbook.bids.is_empty());
-        assert!(orderbook.asks.is_empty())
+        assert!(orderbook.bid_levels.is_empty());
+        assert!(orderbook.ask_levels.is_empty())
     }
 
     #[test]
@@ -283,8 +299,8 @@ mod tests {
         assert_eq!(trade.bid.price, price);
         assert_eq!(trade.bid.quantity, 5);
 
-        assert!(orderbook.bids.is_empty());
-        assert!(!orderbook.asks.is_empty());
+        assert!(orderbook.bid_levels.is_empty());
+        assert!(!orderbook.ask_levels.is_empty());
     }
 
     #[test]
