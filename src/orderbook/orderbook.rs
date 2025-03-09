@@ -152,7 +152,7 @@ impl Orderbook {
             false => vec![],
         };
 
-        if order.type_ == OrderType::FillOrKill {
+        if order.type_ == OrderType::FillAndKill {
             let _ = self.cancel_order(order.id)?;
         }
 
@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn fill_or_kill_order() {
         let mut orderbook = Orderbook::new();
-        let order = Order::new(OrderType::FillOrKill, OrderSide::Buy, 1, 1);
+        let order = Order::new(OrderType::FillAndKill, OrderSide::Buy, 1, 1);
 
         let trades = orderbook.add_order(order).unwrap();
 

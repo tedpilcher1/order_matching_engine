@@ -59,7 +59,7 @@ impl Order {
 #[derive(Copy, Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub enum OrderType {
     Normal,
-    FillOrKill,
+    FillAndKill,
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Deserialize, Serialize)]
