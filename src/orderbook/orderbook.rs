@@ -23,7 +23,6 @@ pub struct Orderbook {
     orders: HashMap<Uuid, Order>,
 }
 
-// TODO: Check if can match before running matching algorithm
 impl Orderbook {
     pub fn new() -> Self {
         Self {
@@ -113,8 +112,6 @@ impl Orderbook {
             }
         }
 
-        let start_time = Utc::now();
-
         if self.orders.contains_key(&order.id) {
             return Err(anyhow!("Order id already exists "));
         }
@@ -136,17 +133,22 @@ impl Orderbook {
 
         self.orders.insert(order.id, order);
 
-        let res = self.match_orders();
-
-        let end_time = Utc::now();
-
-        MATCHING_DURATION.observe((end_time - start_time).num_seconds() as f64);
+        let res = match self.can_match(&order.side, &order.price) {
+            true => {
+                let start_time = Utc::now();
+                let res = self.match_orders();
+                let end_time = Utc::now();
+                MATCHING_DURATION.observe((end_time - start_time).num_seconds() as f64);
+                res?
+            }
+            false => vec![],
+        };
 
         if order.type_ == OrderType::FillOrKill {
             let _ = self.cancel_order(order.id)?;
         }
 
-        res
+        Ok(res)
     }
 
     fn can_match(&mut self, side: &OrderSide, price: &Price) -> bool {
@@ -231,8 +233,6 @@ impl Orderbook {
 
 #[cfg(test)]
 mod tests {
-    use crate::orderbook;
-
     use super::*;
 
     fn assert_empty_orderbook(orderbook: &Orderbook) {
