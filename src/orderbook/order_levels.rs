@@ -41,7 +41,10 @@ where
     fn remove_order(&mut self, key: &K, order_id: &Uuid) -> bool {
         if let Some(orders) = self.levels.get_mut(key) {
             if let Some(index) = orders.iter().position(|x| x == order_id) {
-                let _ = orders.remove(index);
+                orders.remove(index);
+                if orders.is_empty() {
+                    self.levels.remove(key);
+                }
                 return true;
             }
         }
