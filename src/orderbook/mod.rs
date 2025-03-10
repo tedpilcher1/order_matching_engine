@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub mod order_levels;
 pub mod orderbook;
 
 type Price = i64;
@@ -55,11 +56,9 @@ impl Order {
         self.initial_quantity - self.remaining_quantity
     }
 
-    fn fill(&mut self, quantity: Quantity) -> Result<()> {
+    fn fill(&mut self, quantity: Quantity) -> Result<(), ProcessTradeError> {
         if quantity > self.remaining_quantity {
-            return Err(anyhow!(
-                "Order cannot be filled for more that its remaining quantity"
-            ));
+            return Err(ProcessTradeError::FillQuantityHigherThanRemaining);
         }
 
         self.remaining_quantity -= quantity;
@@ -104,4 +103,18 @@ impl From<(Order, Quantity)> for TradeInfo {
 pub struct Trade {
     bid: TradeInfo,
     ask: TradeInfo,
+}
+
+#[derive(Debug)]
+pub enum ProcessTradeError {
+    MinQuantityNotMet(MinQuantityNotMetTypes),
+    PriceDiscrepancy,
+    FillQuantityHigherThanRemaining,
+}
+
+#[derive(Debug)]
+pub enum MinQuantityNotMetTypes {
+    Ask,
+    Bid,
+    AskAndBid,
 }
