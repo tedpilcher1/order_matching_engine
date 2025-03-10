@@ -42,10 +42,7 @@ impl Orderbook {
     ///
     /// Quantity of new order is abs(modified_new_order - old_order)
     pub fn modify_order(&mut self, order: Order) -> Result<()> {
-        let existing_order = match &order.side {
-            OrderSide::Buy => self.bid_orders.get(&order.id),
-            OrderSide::Sell => self.ask_orders.get(&order.id),
-        };
+        let existing_order = self.orders.get(&order.id);
 
         match existing_order {
             Some(existing_order) => {
@@ -53,7 +50,7 @@ impl Orderbook {
                     return Ok(());
                 }
 
-                if let Ok(Some(cancelled_order)) = self.cancel_order(order.id) {
+                if let Some(cancelled_order) = self.cancel_order(order.id) {
                     let remaining_quantity = order
                         .remaining_quantity
                         .abs_diff(cancelled_order.remaining_quantity);
