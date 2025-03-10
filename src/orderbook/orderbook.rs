@@ -152,11 +152,20 @@ impl Orderbook {
             false => vec![],
         };
 
-        if order.type_ == OrderType::FillAndKill {
-            let _ = self.cancel_order(order.id)?;
-        }
+        self.handle_order_type(&order.type_, &order.id)?;
 
         Ok(res)
+    }
+
+    fn handle_order_type(&mut self, order_type: &OrderType, order_id: &Uuid) -> Result<()> {
+        match order_type {
+            OrderType::Kill => {
+                let _ = self.cancel_order(*order_id)?;
+            }
+            OrderType::Normal => {}
+        }
+
+        Ok(())
     }
 
     fn can_match(&mut self, side: &OrderSide, price: &Price) -> bool {
@@ -306,7 +315,7 @@ mod tests {
     #[test]
     fn fill_or_kill_order() {
         let mut orderbook = Orderbook::new();
-        let order = Order::new(OrderType::FillAndKill, OrderSide::Buy, 1, 1);
+        let order = Order::new(OrderType::Kill, OrderSide::Buy, 1, 1);
 
         let trades = orderbook.add_order(order).unwrap();
 
