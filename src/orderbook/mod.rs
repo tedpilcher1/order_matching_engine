@@ -68,13 +68,6 @@ pub enum OrderSide {
     Sell,
 }
 
-struct OrderModify {
-    order_id: Uuid,
-    side: OrderSide,
-    price: Price,
-    quantity: Quantity,
-}
-
 #[derive(Debug)]
 struct TradeInfo {
     order_id: Uuid,
