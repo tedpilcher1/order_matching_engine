@@ -15,6 +15,7 @@ pub trait OrderLevels {
     fn get_prices(&self) -> Vec<&Price>;
 }
 
+#[derive(Debug)]
 struct GenericOrderLevels<K> {
     levels: BTreeMap<K, VecDeque<Uuid>>,
 }
@@ -55,6 +56,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct AskOrderLevels {
     inner: GenericOrderLevels<Price>,
 }
@@ -83,6 +85,7 @@ impl OrderLevels for AskOrderLevels {
     }
 }
 
+#[derive(Debug)]
 pub struct BidOrderLevels {
     inner: GenericOrderLevels<Reverse<Price>>,
 }
