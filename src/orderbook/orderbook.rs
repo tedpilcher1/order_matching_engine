@@ -11,14 +11,17 @@ use crate::metrics::{
     BUY_ORDER_PRICE, MATCHING_DURATION, ORDER_COUNTER, SELL_ORDER_PRICE, TRADE_COUNTER,
 };
 
-use super::{Order, OrderSide, OrderType, Price, ProcessTradeError, Trade};
+use super::{
+    order_levels::{AskOrderLevels, BidOrderLevels, OrderLevels},
+    Order, OrderSide, OrderType, Price, ProcessTradeError, Trade,
+};
 
 /// Map to reresents bids and asks
 /// bids desc (first/highest is best buy price), asks asc (first/lowest is best sell price)
 #[derive(Debug)]
 pub struct Orderbook {
-    ask_levels: BTreeMap<Price, VecDeque<Uuid>>,
-    bid_levels: BTreeMap<Reverse<Price>, VecDeque<Uuid>>,
+    ask_levels: AskOrderLevels,
+    bid_levels: BidOrderLevels,
     bid_orders: HashMap<Uuid, Order>,
     ask_orders: HashMap<Uuid, Order>,
 }
@@ -26,8 +29,8 @@ pub struct Orderbook {
 impl Orderbook {
     pub fn new() -> Self {
         Self {
-            ask_levels: BTreeMap::new(),
-            bid_levels: BTreeMap::new(),
+            ask_levels: AskOrderLevels::new(),
+            bid_levels: BidOrderLevels::new(),
             bid_orders: HashMap::new(),
             ask_orders: HashMap::new(),
         }
