@@ -2,7 +2,7 @@ use std::thread;
 
 use actix_web::{web, App, HttpServer};
 use crossbeam::channel::{self, Receiver};
-use matching_engine::{
+use order_matching_engine::{
     metrics::register_custom_metrics,
     orderbook::{orderbook::Orderbook, Order},
     web_server::{
@@ -21,7 +21,7 @@ fn worker_thread(receiver: Receiver<OrderRequest>) {
             match order_request {
                 OrderRequest::Trade(trade_request) => {
                     if let Ok(order_request) = Order::try_from(trade_request) {
-                        let _ = orderbook.add_order(order_request);
+                        let _ = orderbook.insert_order(order_request);
                     }
                 }
                 OrderRequest::Cancel(order_id) => {
