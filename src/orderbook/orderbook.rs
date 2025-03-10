@@ -34,7 +34,7 @@ impl Orderbook {
         }
     }
 
-    /// Modifies an order
+    /// Modifies an order, equivalent to cancel + add
     ///
     /// Cannot modify an order to a new type or side
     ///
