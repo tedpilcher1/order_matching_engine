@@ -86,8 +86,8 @@ struct TradeInfo {
     quantity: Quantity,
 }
 
-impl From<(Order, Quantity)> for TradeInfo {
-    fn from(value: (Order, Quantity)) -> Self {
+impl From<(&Order, Quantity)> for TradeInfo {
+    fn from(value: (&Order, Quantity)) -> Self {
         let order = value.0;
         let quantity = value.1;
         Self {
@@ -105,6 +105,7 @@ pub struct Trade {
     ask: TradeInfo,
 }
 
+// TODO: Simplify
 #[derive(Debug)]
 pub enum ProcessTradeError {
     MinQuantityNotMet(Vec<MinQuantityNotMetTypes>),

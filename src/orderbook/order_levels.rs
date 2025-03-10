@@ -14,6 +14,7 @@ pub trait OrderLevels {
     fn get_order(&self, price: Price, offset: usize) -> Option<&Uuid>;
     fn get_prices(&self) -> Vec<&Price>;
     fn get_best_price(&self) -> Option<&Price>;
+    fn get_orders(&self, price: &Price) -> Option<&VecDeque<Uuid>>;
 }
 
 #[derive(Debug)]
@@ -64,6 +65,10 @@ where
             .first_key_value()
             .and_then(|key_value| Some(key_value.0))
     }
+
+    fn get_orders(&self, key: &K) -> Option<&VecDeque<Uuid>> {
+        self.levels.get(key)
+    }
 }
 
 #[derive(Debug)]
@@ -96,6 +101,10 @@ impl OrderLevels for AskOrderLevels {
 
     fn get_best_price(&self) -> Option<&Price> {
         self.inner.get_best_price()
+    }
+
+    fn get_orders(&self, price: &Price) -> Option<&VecDeque<Uuid>> {
+        self.inner.get_orders(price)
     }
 }
 
@@ -135,5 +144,9 @@ impl OrderLevels for BidOrderLevels {
         self.inner
             .get_best_price()
             .map(|reverse_price| &reverse_price.0)
+    }
+
+    fn get_orders(&self, price: &Price) -> Option<&VecDeque<Uuid>> {
+        self.inner.get_orders(&Reverse(*price))
     }
 }
