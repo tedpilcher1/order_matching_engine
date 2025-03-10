@@ -134,14 +134,14 @@ impl Orderbook {
 
     fn can_match(&mut self, side: &OrderSide, price: &Price) -> bool {
         match side {
-            OrderSide::Buy => match self.ask_levels.first_key_value() {
-                Some((best_ask, _)) => price >= best_ask,
-                None => false,
-            },
-            OrderSide::Sell => match self.bid_levels.first_key_value() {
-                Some((Reverse(best_bid), _)) => price <= best_bid,
-                None => false,
-            },
+            OrderSide::Buy => self
+                .ask_levels
+                .get_best_price()
+                .map_or(false, |best_price| price >= best_price),
+            OrderSide::Sell => self
+                .bid_levels
+                .get_best_price()
+                .map_or(false, |best_price| price <= best_price),
         }
     }
 
