@@ -107,7 +107,7 @@ pub struct Trade {
 
 #[derive(Debug)]
 pub enum ProcessTradeError {
-    MinQuantityNotMet(MinQuantityNotMetTypes),
+    MinQuantityNotMet(Vec<MinQuantityNotMetTypes>),
     PriceDiscrepancy,
     FillQuantityHigherThanRemaining,
 }
@@ -116,5 +116,4 @@ pub enum ProcessTradeError {
 pub enum MinQuantityNotMetTypes {
     Ask,
     Bid,
-    AskAndBid,
 }
