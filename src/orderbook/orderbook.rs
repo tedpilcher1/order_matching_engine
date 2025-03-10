@@ -3,16 +3,15 @@ use std::{
     collections::{BTreeMap, HashMap, VecDeque},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use chrono::Utc;
 use uuid::Uuid;
 
 use crate::metrics::{
-    BUY_ORDER_PRICE, MATCHING_DURATION, ORDERS_FILLED_COUNTER, ORDER_COUNTER, SELL_ORDER_PRICE,
-    TRADE_COUNTER,
+    BUY_ORDER_PRICE, MATCHING_DURATION, ORDER_COUNTER, SELL_ORDER_PRICE, TRADE_COUNTER,
 };
 
-use super::{Order, OrderSide, OrderType, Price, Trade};
+use super::{Order, OrderSide, OrderType, Price, ProcessTradeError, Trade};
 
 /// Map to reresents bids and asks
 /// bids desc (first/highest is best buy price), asks asc (first/lowest is best sell price)
