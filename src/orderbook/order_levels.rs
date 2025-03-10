@@ -82,3 +82,35 @@ impl OrderLevels for AskOrderLevels {
         self.inner.get_prices()
     }
 }
+
+pub struct BidOrderLevels {
+    inner: GenericOrderLevels<Reverse<Price>>,
+}
+
+impl OrderLevels for BidOrderLevels {
+    fn new() -> Self {
+        Self {
+            inner: GenericOrderLevels::new(),
+        }
+    }
+
+    fn insert_order(&mut self, price: Price, order_id: Uuid) {
+        self.inner.insert_order(Reverse(price), order_id);
+    }
+
+    fn remove_order(&mut self, price: &Price, order_id: &Uuid) -> bool {
+        self.inner.remove_order(&Reverse(*price), order_id)
+    }
+
+    fn get_order(&self, price: Price, offset: usize) -> Option<&Uuid> {
+        self.inner.get_order(Reverse(price), offset)
+    }
+
+    fn get_prices(&self) -> Vec<&Price> {
+        self.inner
+            .get_prices()
+            .into_iter()
+            .map(|reverse_price| &reverse_price.0)
+            .collect()
+    }
+}
