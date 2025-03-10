@@ -13,6 +13,7 @@ pub trait OrderLevels {
     fn remove_order(&mut self, price: &Price, order_id: &Uuid) -> bool;
     fn get_order(&self, price: Price, offset: usize) -> Option<&Uuid>;
     fn get_prices(&self) -> Vec<&Price>;
+    fn get_best_price(&self) -> Option<&Price>;
 }
 
 #[derive(Debug)]
@@ -89,6 +90,10 @@ impl OrderLevels for AskOrderLevels {
     fn get_prices(&self) -> Vec<&Price> {
         self.inner.get_prices()
     }
+
+    fn get_best_price(&self) -> Option<&Price> {
+        self.inner.get_best_price()
+    }
 }
 
 #[derive(Debug)]
@@ -121,5 +126,11 @@ impl OrderLevels for BidOrderLevels {
             .into_iter()
             .map(|reverse_price| &reverse_price.0)
             .collect()
+    }
+
+    fn get_best_price(&self) -> Option<&Price> {
+        self.inner
+            .get_best_price()
+            .map(|reverse_price| &reverse_price.0)
     }
 }
