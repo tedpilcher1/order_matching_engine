@@ -145,12 +145,24 @@ impl Orderbook {
         }
     }
 
-    fn process_trade(bid: &mut Order, ask: &mut Order) -> Result<Option<Trade>> {
-        if ask.price > bid.price {
-            return Ok(None);
+    fn process_trade(bid: &mut Order, ask: &mut Order) -> Result<Trade, ProcessTradeError> {
+        if ask.price != bid.price {
+            return Err(ProcessTradeError::PriceDiscrepancy);
         }
 
         let quantity = min(ask.remaining_quantity, bid.remaining_quantity);
+
+        if quantity < ask.minimum_quantity || quantity < bid.minimum_quantity {
+            let mut quantity_errors = vec![];
+            if quantity < ask.minimum_quantity {
+                quantity_errors.push(MinQuantityNotMetTypes::Ask);
+            }
+            if quantity < bid.minimum_quantity {
+                quantity_errors.push(MinQuantityNotMetTypes::Bid);
+            }
+            return Err(ProcessTradeError::MinQuantityNotMet(quantity_errors));
+        }
+
         bid.fill(quantity)?;
         ask.fill(quantity)?;
 
@@ -161,7 +173,7 @@ impl Orderbook {
 
         TRADE_COUNTER.inc();
 
-        Ok(Some(trade))
+        Ok(trade)
     }
 
     fn match_orders(&mut self) -> Result<Vec<Trade>> {
