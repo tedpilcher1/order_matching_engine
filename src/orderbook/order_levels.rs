@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::{
+    cmp::Reverse,
+    collections::{BTreeMap, VecDeque},
+};
 
 use uuid::Uuid;
 
@@ -49,5 +52,33 @@ where
 
     fn get_prices(&self) -> Vec<&K> {
         self.levels.keys().collect()
+    }
+}
+
+pub struct AskOrderLevels {
+    inner: GenericOrderLevels<Price>,
+}
+
+impl OrderLevels for AskOrderLevels {
+    fn new() -> Self {
+        Self {
+            inner: GenericOrderLevels::new(),
+        }
+    }
+
+    fn insert_order(&mut self, price: Price, order_id: Uuid) {
+        self.inner.insert_order(price, order_id);
+    }
+
+    fn remove_order(&mut self, price: &Price, order_id: &Uuid) -> bool {
+        self.inner.remove_order(price, order_id)
+    }
+
+    fn get_order(&self, price: Price, offset: usize) -> Option<&Uuid> {
+        self.inner.get_order(price, offset)
+    }
+
+    fn get_prices(&self) -> Vec<&Price> {
+        self.inner.get_prices()
     }
 }
