@@ -91,44 +91,18 @@ impl Orderbook {
         None
     }
 
-    pub fn add_order(&mut self, order: Order) -> Result<Vec<Trade>> {
+    pub fn insert_order(&mut self, order: Order) -> Result<Vec<Trade>> {
         ORDER_COUNTER.inc();
 
-        match order.side {
-            OrderSide::Buy => {
-                for _ in 0..order.initial_quantity {
-                    BUY_ORDER_PRICE.observe(order.price as f64);
-                }
-            }
-            OrderSide::Sell => {
-                for _ in 0..order.initial_quantity {
-                    SELL_ORDER_PRICE.observe(order.price as f64);
-                }
-            }
+        if self.orders.contains_key(&order.id) {
+            return Err(anyhow!("Order id already in use"));
         }
 
-        match &order.side {
-            OrderSide::Buy => {
-                if self.bid_orders.contains_key(&order.id) {
-                    return Err(anyhow!("Order id already exists "));
-                }
+        let _ = self.orders.insert(order.id, order);
 
-                self.bid_levels
-                    .entry(Reverse(order.price))
-                    .or_insert_with(VecDeque::new)
-                    .push_back(order.id);
-                self.bid_orders.insert(order.id, order);
-            }
-            OrderSide::Sell => {
-                if self.ask_orders.contains_key(&order.id) {
-                    return Err(anyhow!("Order id already exists "));
-                }
-                self.ask_levels
-                    .entry(order.price)
-                    .or_insert_with(VecDeque::new)
-                    .push_back(order.id);
-                self.ask_orders.insert(order.id, order);
-            }
+        match &order.side {
+            OrderSide::Buy => self.bid_levels.insert_order(order.price, order.id),
+            OrderSide::Sell => self.ask_levels.insert_order(order.price, order.id),
         }
 
         let res = match self.can_match(&order.side, &order.price) {
