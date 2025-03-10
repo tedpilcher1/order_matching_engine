@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     metrics::{REGISTRY, REQUESTS_COUNTER},
-    web_server::types::{AppState, OrderRequest, TradeRequest},
+    web_server::{AppState, OrderRequest, TradeRequest},
 };
 
 #[post("/modify_order")]

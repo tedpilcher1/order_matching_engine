@@ -9,7 +9,7 @@ use order_matching_engine::{
         endpoints::{
             cancel_order_endpoint, create_order_endpoint, metrics_endpoint, modify_order_endpoint,
         },
-        types::{AppState, OrderRequest},
+        AppState, OrderRequest,
     },
 };
 
