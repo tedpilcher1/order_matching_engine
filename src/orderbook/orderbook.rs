@@ -77,25 +77,11 @@ impl Orderbook {
         Ok(())
     }
 
-    pub fn cancel_order(&mut self, order_id: Uuid) -> Result<Option<Order>> {
-        if let Some(order) = self.bid_orders.get(&order_id) {
-            if let Some(bid_levels) = self.bid_levels.get_mut(&Reverse(order.price)) {
-                bid_levels.retain(|&x| x != order.id);
-                if bid_levels.is_empty() {
-                    self.bid_levels.remove(&Reverse(order.price));
-                    return Ok(Some(*order));
-                }
-            }
-        }
-
-        if let Some(order) = self.ask_orders.get(&order_id) {
-            if let Some(ask_levels) = self.ask_levels.get_mut(&order.price) {
-                ask_levels.retain(|&x| x != order.id);
-                if ask_levels.is_empty() {
-                    self.ask_levels.remove(&order.price);
-                    return Ok(Some(*order));
-                }
-            }
+    fn find_order(&self, order_id: &Uuid) -> Option<&Order> {
+        self.bid_orders
+            .get(order_id)
+            .or_else(|| self.ask_orders.get(order_id))
+    }
         }
 
         Ok(None)
