@@ -80,14 +80,20 @@ impl Orderbook {
         Ok(())
     }
 
-    fn find_order(&self, order_id: &Uuid) -> Option<&Order> {
-        self.bid_orders
-            .get(order_id)
-            .or_else(|| self.ask_orders.get(order_id))
-    }
+    pub fn cancel_order(&mut self, order_id: Uuid) -> Option<Order> {
+        if let Some(order) = self.orders.remove(&order_id) {
+            let price = order.price;
+            let cancelled = match order.side {
+                OrderSide::Buy => self.bid_levels.remove_order(&price, &order_id),
+                OrderSide::Sell => self.ask_levels.remove_order(&price, &order_id),
+            };
+
+            if cancelled {
+                return Some(order);
+            }
         }
 
-        Ok(None)
+        None
     }
 
     pub fn add_order(&mut self, order: Order) -> Result<Vec<Trade>> {
