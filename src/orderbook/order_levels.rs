@@ -54,6 +54,12 @@ where
     fn get_prices(&self) -> Vec<&K> {
         self.levels.keys().collect()
     }
+
+    fn get_best_price(&self) -> Option<&K> {
+        self.levels
+            .first_key_value()
+            .and_then(|key_value| Some(key_value.0))
+    }
 }
 
 #[derive(Debug)]
