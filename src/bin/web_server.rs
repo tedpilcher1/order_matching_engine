@@ -4,7 +4,7 @@ use actix_web::{web, App, HttpServer};
 use crossbeam::channel::{self, Receiver};
 use matching_engine::{
     metrics::register_custom_metrics,
-    orderbook::orderbook::Orderbook,
+    orderbook::{orderbook::Orderbook, Order},
     web_server::{
         endpoints::{
             cancel_order_endpoint, create_order_endpoint, metrics_endpoint, modify_order_endpoint,
@@ -20,13 +20,17 @@ fn worker_thread(receiver: Receiver<OrderRequest>) {
         if let Ok(order_request) = receiver.recv() {
             match order_request {
                 OrderRequest::Trade(trade_request) => {
-                    let _ = orderbook.add_order(trade_request.into());
+                    if let Ok(order_request) = Order::try_from(trade_request) {
+                        let _ = orderbook.add_order(order_request);
+                    }
                 }
                 OrderRequest::Cancel(order_id) => {
                     let _ = orderbook.cancel_order(order_id);
                 }
                 OrderRequest::Modify(trade_request) => {
-                    let _ = orderbook.modify_order(trade_request.into());
+                    if let Ok(order_request) = Order::try_from(trade_request) {
+                        let _ = orderbook.modify_order(order_request);
+                    }
                 }
             }
         }

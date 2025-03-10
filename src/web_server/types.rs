@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -19,18 +20,26 @@ pub struct TradeRequest {
     pub order_side: OrderSide,
     pub price: Price,
     pub quantity: Quantity,
+    pub minimum_quantity: Quantity,
 }
 
-impl From<TradeRequest> for Order {
-    fn from(order_request: TradeRequest) -> Self {
-        Order {
+impl TryFrom<TradeRequest> for Order {
+    type Error = anyhow::Error;
+
+    fn try_from(trade_request: TradeRequest) -> Result<Self, Self::Error> {
+        if trade_request.minimum_quantity > trade_request.quantity {
+            return Err(anyhow!("Minimum quantity > quantity"));
+        }
+
+        Ok(Order {
             type_: OrderType::Normal,
             id: Uuid::new_v4(),
-            side: order_request.order_side,
-            price: order_request.price,
-            initial_quantity: order_request.quantity,
-            remaining_quantity: order_request.quantity,
-        }
+            side: trade_request.order_side,
+            price: trade_request.price,
+            initial_quantity: trade_request.quantity,
+            remaining_quantity: trade_request.quantity,
+            minimum_quantity: trade_request.minimum_quantity,
+        })
     }
 }
 

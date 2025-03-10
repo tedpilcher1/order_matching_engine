@@ -65,6 +65,7 @@ impl Orderbook {
                         price: order.price,
                         initial_quantity: remaining_quantity,
                         remaining_quantity,
+                        minimum_quantity: cancelled_order.minimum_quantity,
                     };
 
                     let _ = self.add_order(fresh_order);
@@ -271,8 +272,9 @@ mod tests {
         let price = 10;
         let quantity = 1;
 
-        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity);
-        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, quantity);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity, 0).unwrap();
+        let sell_order =
+            Order::new(OrderType::Normal, OrderSide::Sell, price, quantity, 0).unwrap();
 
         let first_trades = orderbook.add_order(buy_order).unwrap();
         let second_trades = orderbook.add_order(sell_order).unwrap();
@@ -293,8 +295,8 @@ mod tests {
     fn partial_order_match() {
         let mut orderbook = Orderbook::new();
         let price = 10;
-        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 5);
-        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 10);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 5, 0).unwrap();
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 10, 0).unwrap();
 
         let first_trades = orderbook.add_order(buy_order).unwrap();
         let second_trades = orderbook.add_order(sell_order).unwrap();
@@ -315,7 +317,7 @@ mod tests {
     #[test]
     fn fill_or_kill_order() {
         let mut orderbook = Orderbook::new();
-        let order = Order::new(OrderType::Kill, OrderSide::Buy, 1, 1);
+        let order = Order::new(OrderType::Kill, OrderSide::Buy, 1, 1, 0).unwrap();
 
         let trades = orderbook.add_order(order).unwrap();
 

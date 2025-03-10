@@ -25,18 +25,30 @@ pub struct Order {
     pub price: Price,
     pub initial_quantity: Quantity,
     pub remaining_quantity: Quantity,
+    pub minimum_quantity: Quantity,
 }
 
 impl Order {
-    pub fn new(type_: OrderType, side: OrderSide, price: Price, quantity: Quantity) -> Self {
-        Self {
+    pub fn new(
+        type_: OrderType,
+        side: OrderSide,
+        price: Price,
+        quantity: Quantity,
+        minimum_quantity: Quantity,
+    ) -> Option<Self> {
+        if minimum_quantity > quantity {
+            return None;
+        }
+
+        Some(Self {
             type_,
             id: Uuid::new_v4(),
             side,
             price,
             initial_quantity: quantity,
             remaining_quantity: quantity,
-        }
+            minimum_quantity: quantity,
+        })
     }
 
     fn get_filled_quantity(&self) -> Quantity {
