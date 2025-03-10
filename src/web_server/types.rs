@@ -32,7 +32,7 @@ impl TryFrom<TradeRequest> for Order {
         }
 
         Ok(Order {
-            type_: OrderType::Normal,
+            type_: trade_request.order_type,
             id: Uuid::new_v4(),
             side: trade_request.order_side,
             price: trade_request.price,
