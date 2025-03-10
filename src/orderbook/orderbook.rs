@@ -22,8 +22,7 @@ use super::{
 pub struct Orderbook {
     ask_levels: AskOrderLevels,
     bid_levels: BidOrderLevels,
-    bid_orders: HashMap<Uuid, Order>,
-    ask_orders: HashMap<Uuid, Order>,
+    orders: HashMap<Uuid, Order>,
 }
 
 impl Orderbook {
@@ -31,8 +30,7 @@ impl Orderbook {
         Self {
             ask_levels: AskOrderLevels::new(),
             bid_levels: BidOrderLevels::new(),
-            bid_orders: HashMap::new(),
-            ask_orders: HashMap::new(),
+            orders: HashMap::new(),
         }
     }
 
