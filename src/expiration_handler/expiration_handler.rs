@@ -26,6 +26,23 @@ impl ExpirationHandler {
         }
     }
 
+    pub fn run(&mut self) {
+        loop {
+            if let Ok(order_expiration_request) = self.expiration_order_request_reciever.try_recv()
+            {
+                let _ = self.insert_expiring_order(order_expiration_request);
+            }
+
+            if let Some(order) = self.expiration_queue.peek() {
+                if *order.1 < Utc::now().timestamp() {
+                    // TODO: Need to handle this error, might just be best to log it
+                    let _ = self.send_cancellation_request(*order.0);
+                    self.expiration_queue.pop();
+                }
+            }
+        }
+    }
+
     fn insert_expiring_order(
         &mut self,
         order_expiration_request: OrderExpirationRequest,
