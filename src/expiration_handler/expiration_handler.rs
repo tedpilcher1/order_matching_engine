@@ -25,5 +25,14 @@ impl ExpirationHandler {
             expiration_queue: PriorityQueue::new(),
         }
     }
+    fn send_cancellation_request(&mut self, order_id: Uuid) -> Result<()> {
+        let order_request = OrderRequest::Cancel(CancelRequestType::Internal, order_id);
+
+        match self.cancellation_request_sender.send(order_request) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow!(
+                "Failed to send cancellation request order to orderbook"
+            )),
+        }
     }
 }
