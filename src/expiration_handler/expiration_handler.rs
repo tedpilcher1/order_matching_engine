@@ -72,3 +72,97 @@ impl ExpirationHandler {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Duration;
+    use crossbeam::channel;
+    use uuid::Uuid;
+
+    #[test]
+    fn timestamps_occurring_sooner_given_higher_priority() {
+        let (_, rx) = channel::unbounded();
+        let (cancel_tx, _cancel_rx) = channel::unbounded();
+        let mut handler = ExpirationHandler::new(cancel_tx, rx);
+
+        let order_id_1 = Uuid::new_v4();
+        let timestamp = (Utc::now() + Duration::seconds(100)).timestamp();
+        let order_expiration_request = OrderExpirationRequest {
+            order_id: order_id_1,
+            timestamp,
+        };
+
+        handler
+            .insert_expiring_order(order_expiration_request)
+            .unwrap();
+
+        let order_id_2 = Uuid::new_v4();
+        let timestamp = (Utc::now() + Duration::seconds(1)).timestamp();
+        let order_expiration_request = OrderExpirationRequest {
+            order_id: order_id_2,
+            timestamp,
+        };
+
+        handler
+            .insert_expiring_order(order_expiration_request)
+            .unwrap();
+
+        assert_eq!(handler.expiration_queue.pop().unwrap().0, order_id_2);
+    }
+
+    #[test]
+    fn test_insert_expiring_order() {
+        let (_, rx) = channel::unbounded();
+        let (cancel_tx, _cancel_rx) = channel::unbounded();
+        let mut handler = ExpirationHandler::new(cancel_tx, rx);
+
+        let order_id = Uuid::new_v4();
+        let timestamp = (Utc::now() + Duration::seconds(2)).timestamp();
+        let order_expiration_request = OrderExpirationRequest {
+            order_id,
+            timestamp,
+        };
+
+        assert!(handler
+            .insert_expiring_order(order_expiration_request)
+            .is_ok());
+        assert_eq!(handler.expiration_queue.len(), 1);
+    }
+
+    #[test]
+    fn test_insert_expiring_order_with_past_timestamp() {
+        let (_, rx) = channel::unbounded();
+        let (cancel_tx, _cancel_rx) = channel::unbounded();
+        let mut handler = ExpirationHandler::new(cancel_tx, rx);
+
+        let order_id = Uuid::new_v4();
+        let timestamp = (Utc::now() - Duration::seconds(60)).timestamp();
+        let order_expiration_request = OrderExpirationRequest {
+            order_id,
+            timestamp,
+        };
+
+        assert!(handler
+            .insert_expiring_order(order_expiration_request)
+            .is_err());
+        assert_eq!(handler.expiration_queue.len(), 0);
+    }
+
+    #[test]
+    fn test_send_cancellation_request() {
+        let (_, rx) = channel::unbounded();
+        let (cancel_tx, cancel_rx) = channel::unbounded();
+        let mut handler = ExpirationHandler::new(cancel_tx, rx);
+
+        let order_uuid = Uuid::new_v4();
+        assert!(handler.send_cancellation_request(order_uuid).is_ok());
+
+        match cancel_rx.try_recv() {
+            Ok(OrderRequest::Cancel(CancelRequestType::Internal, received_uuid)) => {
+                assert_eq!(received_uuid, order_uuid);
+            }
+            _ => panic!("Did not receive expected cancellation request"),
+        }
+    }
+}
