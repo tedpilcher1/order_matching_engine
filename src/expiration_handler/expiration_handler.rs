@@ -13,4 +13,17 @@ pub struct ExpirationHandler {
     expiration_order_request_reciever: Receiver<OrderExpirationRequest>,
     expiration_queue: PriorityQueue<Uuid, UnixTimestamp>,
 }
+
+impl ExpirationHandler {
+    pub fn new(
+        cancellation_request_sender: Sender<OrderRequest>,
+        expiration_order_request_reciever: Receiver<OrderExpirationRequest>,
+    ) -> Self {
+        Self {
+            cancellation_request_sender,
+            expiration_order_request_reciever,
+            expiration_queue: PriorityQueue::new(),
+        }
+    }
+    }
 }
