@@ -28,6 +28,12 @@ impl ExpirationHandler {
         }
     }
 
+    fn remove_expiration_request(&mut self, order_id: Uuid) {
+        if let Some(_) = self.expiration_queue.get_priority(&order_id) {
+            self.expiration_queue.remove(&order_id);
+        }
+    }
+
     pub fn run(&mut self) {
         loop {
             if let Ok(order_expiration_request) = self.expiration_order_request_reciever.try_recv()
