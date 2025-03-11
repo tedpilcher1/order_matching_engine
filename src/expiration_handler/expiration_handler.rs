@@ -9,5 +9,8 @@ use crate::web_server::{CancelRequestType, OrderRequest};
 use super::{OrderExpirationRequest, UnixTimestamp};
 
 pub struct ExpirationHandler {
-    pub sender: Sender<OrderRequest>, // for cancelling orders
+    cancellation_request_sender: Sender<OrderRequest>,
+    expiration_order_request_reciever: Receiver<OrderExpirationRequest>,
+    expiration_queue: PriorityQueue<Uuid, UnixTimestamp>,
+}
 }
