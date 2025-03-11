@@ -24,8 +24,8 @@ fn worker_thread(receiver: Receiver<OrderRequest>) {
                         let _ = orderbook.insert_order(order_request);
                     }
                 }
-                OrderRequest::Cancel(order_id) => {
-                    let _ = orderbook.cancel_order(order_id);
+                OrderRequest::Cancel(cancel_request_type, order_id) => {
+                    let _ = orderbook.cancel_order(cancel_request_type, order_id);
                 }
                 OrderRequest::Modify(trade_request) => {
                     if let Ok(order_request) = Order::try_from(trade_request) {

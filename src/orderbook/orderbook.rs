@@ -4,7 +4,10 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER};
+use crate::{
+    metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER},
+    web_server::CancelRequestType,
+};
 
 use super::{
     order_levels::{AskOrderLevels, BidOrderLevels, OrderLevels},
@@ -46,7 +49,9 @@ impl Orderbook {
                     return Ok(());
                 }
 
-                if let Some(cancelled_order) = self.cancel_order(order.id) {
+                if let Some(cancelled_order) =
+                    self.cancel_order(CancelRequestType::Internal, order.id)
+                {
                     let remaining_quantity = order
                         .remaining_quantity
                         .abs_diff(cancelled_order.remaining_quantity);
@@ -71,7 +76,11 @@ impl Orderbook {
         Ok(())
     }
 
-    pub fn cancel_order(&mut self, order_id: Uuid) -> Option<Order> {
+    pub fn cancel_order(
+        &mut self,
+        _cancel_request_type: CancelRequestType,
+        order_id: Uuid,
+    ) -> Option<Order> {
         if let Some(order) = self.orders.remove(&order_id) {
             let price = order.price;
             let cancelled = match order.side {
@@ -120,7 +129,7 @@ impl Orderbook {
     fn handle_order_type(&mut self, order_type: &OrderType, order_id: &Uuid) -> Result<()> {
         match order_type {
             OrderType::Kill => {
-                let _ = self.cancel_order(*order_id);
+                let _ = self.cancel_order(CancelRequestType::Internal, *order_id);
             }
             OrderType::Normal => {}
         }

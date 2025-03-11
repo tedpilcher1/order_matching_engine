@@ -12,8 +12,14 @@ type Quantity = u64;
 #[derive(Deserialize, Serialize)]
 pub enum OrderRequest {
     Trade(TradeRequest),
-    Cancel(Uuid),
+    Cancel(CancelRequestType, Uuid),
     Modify(TradeRequest),
+}
+
+#[derive(Deserialize, Serialize)]
+pub enum CancelRequestType {
+    Internal,
+    External,
 }
 
 #[derive(Deserialize, Serialize)]

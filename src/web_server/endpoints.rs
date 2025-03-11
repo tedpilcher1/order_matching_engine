@@ -30,10 +30,10 @@ async fn cancel_order_endpoint(
 ) -> impl Responder {
     REQUESTS_COUNTER.inc();
 
-    match state
-        .sender
-        .send(OrderRequest::Cancel(order_id.into_inner()))
-    {
+    match state.sender.send(OrderRequest::Cancel(
+        crate::web_server::CancelRequestType::External,
+        order_id.into_inner(),
+    )) {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
