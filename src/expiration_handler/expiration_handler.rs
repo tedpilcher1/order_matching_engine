@@ -8,18 +8,18 @@ use uuid::Uuid;
 
 use crate::web_server::{CancelRequestType, OrderRequest};
 
-use super::{OrderExpirationRequest, UnixTimestamp};
+use super::{ExpirationOrderRequest, InsertExpirationRequest, UnixTimestamp};
 
 pub struct ExpirationHandler {
     cancellation_request_sender: Sender<OrderRequest>,
-    expiration_order_request_reciever: Receiver<OrderExpirationRequest>,
+    expiration_order_request_reciever: Receiver<ExpirationOrderRequest>,
     expiration_queue: PriorityQueue<Uuid, Reverse<UnixTimestamp>>,
 }
 
 impl ExpirationHandler {
     pub fn new(
         cancellation_request_sender: Sender<OrderRequest>,
-        expiration_order_request_reciever: Receiver<OrderExpirationRequest>,
+        expiration_order_request_reciever: Receiver<ExpirationOrderRequest>,
     ) -> Self {
         Self {
             cancellation_request_sender,
@@ -36,9 +36,16 @@ impl ExpirationHandler {
 
     pub fn run(&mut self) {
         loop {
-            if let Ok(order_expiration_request) = self.expiration_order_request_reciever.try_recv()
+            if let Ok(expiration_order_request) = self.expiration_order_request_reciever.try_recv()
             {
-                let _ = self.insert_expiring_order(order_expiration_request);
+                match expiration_order_request {
+                    ExpirationOrderRequest::InsertExpirationRequest(insert_expiration_request) => {
+                        let _ = self.insert_expiring_order(insert_expiration_request);
+                    }
+                    ExpirationOrderRequest::RemoveExpirationRequest(order_id) => {
+                        self.remove_expiration_request(order_id)
+                    }
+                }
             }
 
             if let Some(order) = self.expiration_queue.peek() {
@@ -53,7 +60,7 @@ impl ExpirationHandler {
 
     fn insert_expiring_order(
         &mut self,
-        order_expiration_request: OrderExpirationRequest,
+        order_expiration_request: InsertExpirationRequest,
     ) -> Result<()> {
         if order_expiration_request.timestamp < Utc::now().timestamp() {
             bail!("Timestamp in past")
@@ -94,7 +101,7 @@ mod tests {
 
         let order_id_1 = Uuid::new_v4();
         let timestamp = (Utc::now() + Duration::seconds(100)).timestamp();
-        let order_expiration_request = OrderExpirationRequest {
+        let order_expiration_request = InsertExpirationRequest {
             order_id: order_id_1,
             timestamp,
         };
@@ -105,7 +112,7 @@ mod tests {
 
         let order_id_2 = Uuid::new_v4();
         let timestamp = (Utc::now() + Duration::seconds(1)).timestamp();
-        let order_expiration_request = OrderExpirationRequest {
+        let order_expiration_request = InsertExpirationRequest {
             order_id: order_id_2,
             timestamp,
         };
@@ -125,7 +132,7 @@ mod tests {
 
         let order_id = Uuid::new_v4();
         let timestamp = (Utc::now() + Duration::seconds(2)).timestamp();
-        let order_expiration_request = OrderExpirationRequest {
+        let order_expiration_request = InsertExpirationRequest {
             order_id,
             timestamp,
         };
@@ -144,7 +151,7 @@ mod tests {
 
         let order_id = Uuid::new_v4();
         let timestamp = (Utc::now() - Duration::seconds(60)).timestamp();
-        let order_expiration_request = OrderExpirationRequest {
+        let order_expiration_request = InsertExpirationRequest {
             order_id,
             timestamp,
         };
@@ -170,5 +177,27 @@ mod tests {
             }
             _ => panic!("Did not receive expected cancellation request"),
         }
+    }
+
+    #[test]
+    fn test_cancelling_expiration_request() {
+        let (_, rx) = channel::unbounded();
+        let (cancel_tx, _) = channel::unbounded();
+        let mut handler = ExpirationHandler::new(cancel_tx, rx);
+
+        let order_id = Uuid::new_v4();
+        let timestamp = (Utc::now() + Duration::seconds(100)).timestamp();
+        let order_expiration_request = InsertExpirationRequest {
+            order_id,
+            timestamp,
+        };
+
+        handler
+            .insert_expiring_order(order_expiration_request)
+            .unwrap();
+
+        handler.remove_expiration_request(order_id);
+
+        assert!(handler.expiration_queue.is_empty())
     }
 }
