@@ -2260,6 +2260,7 @@ dependencies = [
  "goose",
  "lazy_static",
  "metrics-exporter-prometheus",
+ "priority-queue",
  "prometheus",
  "rand 0.9.0",
  "rlt",
@@ -2389,6 +2390,17 @@ checksum = "f1ccf34da56fc294e7d4ccf69a85992b7dfb826b7cf57bac6a70bba3494cc08a"
 dependencies = [
  "proc-macro2",
  "syn 2.0.99",
+]
+
+[[package]]
+name = "priority-queue"
+version = "2.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f759742601cb7ee8df8780e5f7f9ab7134fb6c5dd2748a61ddd7c960e24db2f8"
+dependencies = [
+ "autocfg",
+ "equivalent",
+ "indexmap",
 ]
 
 [[package]]
