@@ -52,7 +52,7 @@ impl ExpirationHandler {
         }
 
         self.expiration_queue.push(
-            order_expiration_request.order_uuid,
+            order_expiration_request.order_id,
             order_expiration_request.timestamp,
         );
 

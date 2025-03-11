@@ -6,5 +6,5 @@ type UnixTimestamp = i64;
 
 pub struct OrderExpirationRequest {
     timestamp: UnixTimestamp,
-    order_uuid: Uuid,
+    order_id: Uuid,
 }
