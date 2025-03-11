@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+
 use anyhow::{anyhow, bail, Result};
 use chrono::Utc;
 use crossbeam::channel::{Receiver, Sender};
@@ -11,7 +13,7 @@ use super::{OrderExpirationRequest, UnixTimestamp};
 pub struct ExpirationHandler {
     cancellation_request_sender: Sender<OrderRequest>,
     expiration_order_request_reciever: Receiver<OrderExpirationRequest>,
-    expiration_queue: PriorityQueue<Uuid, UnixTimestamp>,
+    expiration_queue: PriorityQueue<Uuid, Reverse<UnixTimestamp>>,
 }
 
 impl ExpirationHandler {
@@ -34,7 +36,7 @@ impl ExpirationHandler {
             }
 
             if let Some(order) = self.expiration_queue.peek() {
-                if *order.1 < Utc::now().timestamp() {
+                if order.1 .0 < Utc::now().timestamp() {
                     // TODO: Need to handle this error, might just be best to log it
                     let _ = self.send_cancellation_request(*order.0);
                     self.expiration_queue.pop();
@@ -53,7 +55,7 @@ impl ExpirationHandler {
 
         self.expiration_queue.push(
             order_expiration_request.order_id,
-            order_expiration_request.timestamp,
+            Reverse(order_expiration_request.timestamp),
         );
 
         Ok(())
