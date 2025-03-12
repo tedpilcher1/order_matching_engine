@@ -10,6 +10,6 @@ pub enum ExpirationOrderRequest {
 }
 
 pub struct InsertExpirationRequest {
-    timestamp: UnixTimestamp,
-    order_id: Uuid,
+    pub timestamp: UnixTimestamp,
+    pub order_id: Uuid,
 }
