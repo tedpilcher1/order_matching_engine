@@ -4,6 +4,7 @@ use prometheus::{Encoder, TextEncoder};
 use uuid::Uuid;
 
 use crate::{
+    expiration_handler::{ExpirationOrderRequest, InsertExpirationRequest},
     metrics::{REGISTRY, REQUESTS_COUNTER},
     web_server::{AppState, OrderRequest, TradeRequest},
 };
@@ -15,7 +16,7 @@ async fn modify_order_endpoint(
 ) -> impl Responder {
     REQUESTS_COUNTER.inc();
     match state
-        .sender
+        .order_engine_sender
         .send(OrderRequest::Modify(order_request.into_inner().into()))
     {
         Ok(_) => HttpResponse::Ok().finish(),
@@ -23,14 +24,14 @@ async fn modify_order_endpoint(
     }
 }
 
-#[post("/cancel_order{order_id}")]
+#[post("/cancel_order/{order_id}")]
 async fn cancel_order_endpoint(
     order_id: web::Path<Uuid>,
     state: web::Data<AppState>,
 ) -> impl Responder {
     REQUESTS_COUNTER.inc();
 
-    match state.sender.send(OrderRequest::Cancel(
+    match state.order_engine_sender.send(OrderRequest::Cancel(
         crate::web_server::CancelRequestType::External,
         order_id.into_inner(),
     )) {
@@ -45,13 +46,37 @@ async fn create_order_endpoint(
     state: web::Data<AppState>,
 ) -> impl Responder {
     REQUESTS_COUNTER.inc();
-    match state
-        .sender
-        .send(OrderRequest::Trade(order_request.into_inner().into()))
+
+    let trade_request = order_request.into_inner();
+    let trade_request_id = trade_request.id;
+    let expiration_date = trade_request.expiration_date;
+
+    if state
+        .order_engine_sender
+        .send(OrderRequest::Trade(trade_request.into()))
+        .is_err()
     {
-        Ok(_) => HttpResponse::Ok().finish(),
-        Err(_) => HttpResponse::InternalServerError().finish(),
+        return HttpResponse::InternalServerError().finish();
     }
+
+    if let Some(expiration_date) = expiration_date {
+        let expiration_request = InsertExpirationRequest {
+            timestamp: expiration_date.and_utc().timestamp(),
+            order_id: trade_request_id,
+        };
+
+        if state
+            .order_expiration_sender
+            .send(ExpirationOrderRequest::InsertExpirationRequest(
+                expiration_request,
+            ))
+            .is_err()
+        {
+            return HttpResponse::InternalServerError().finish();
+        }
+    }
+
+    HttpResponse::Ok().finish()
 }
 
 #[get("/metrics")]
@@ -64,4 +89,19 @@ async fn metrics_endpoint() -> impl Responder {
     HttpResponse::Ok()
         .content_type("text/plain; version=0.0.4")
         .body(buffer)
+}
+
+#[post("/cancel_order_expiration/{order_id}")]
+async fn cancel_order_expiration_endpoint(
+    order_id: web::Path<Uuid>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    match state
+        .order_expiration_sender
+        .send(ExpirationOrderRequest::RemoveExpirationRequest(
+            order_id.into_inner(),
+        )) {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
 }
