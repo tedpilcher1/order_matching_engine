@@ -262,10 +262,6 @@
                 {
                   "color": "green",
                   "value": null
-                },
-                {
-                  "color": "red",
-                  "value": 80
                 }
               ]
             }
@@ -274,11 +270,11 @@
         },
         "gridPos": {
           "h": 5,
-          "w": 6,
+          "w": 12,
           "x": 12,
           "y": 6
         },
-        "id": 9,
+        "id": 13,
         "options": {
           "colorMode": "value",
           "graphMode": "area",
@@ -292,7 +288,7 @@
             "fields": "",
             "values": false
           },
-          "showPercentChange": false,
+          "showPercentChange": true,
           "textMode": "auto",
           "wideLayout": true
         },
@@ -300,13 +296,26 @@
         "targets": [
           {
             "editorMode": "code",
-            "expr": "order_counter - orders_filled_counter",
-            "legendFormat": "__auto",
+            "expr": "rate(orders_filled_counter[5m])",
+            "legendFormat": "Orders filled per second",
             "range": true,
             "refId": "A"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "aef7vvr9tex34d"
+            },
+            "editorMode": "code",
+            "expr": "rate(requests_counter[5m])",
+            "hide": false,
+            "instant": false,
+            "legendFormat": "Requests recieved per second",
+            "range": true,
+            "refId": "B"
           }
         ],
-        "title": "Number of Resting Orders",
+        "title": "",
         "type": "stat"
       },
       {
@@ -411,6 +420,78 @@
         "type": "timeseries"
       },
       {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "aef7vvr9tex34d"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                },
+                {
+                  "color": "orange",
+                  "value": 85
+                },
+                {
+                  "color": "green",
+                  "value": 90
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 5,
+          "w": 6,
+          "x": 12,
+          "y": 11
+        },
+        "id": 14,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "11.5.1",
+        "targets": [
+          {
+            "editorMode": "code",
+            "expr": "# rate(requests_counter[5m]) / rate(order_counter[5m])\n(increase(requests_counter[5m]) / increase(order_counter[5m])) * 100\n",
+            "legendFormat": "__auto",
+            "range": true,
+            "refId": "A"
+          }
+        ],
+        "title": "Percentage of requests immediately processed",
+        "type": "stat"
+      },
+      {
         "collapsed": false,
         "gridPos": {
           "h": 1,
@@ -502,315 +583,6 @@
         ],
         "title": "Matching Duration (over time)",
         "type": "heatmap"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "aef7vvr9tex34d"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "custom": {
-              "axisBorderShow": false,
-              "axisCenteredZero": false,
-              "axisColorMode": "text",
-              "axisLabel": "",
-              "axisPlacement": "auto",
-              "barAlignment": 0,
-              "barWidthFactor": 0.6,
-              "drawStyle": "line",
-              "fillOpacity": 0,
-              "gradientMode": "none",
-              "hideFrom": {
-                "legend": false,
-                "tooltip": false,
-                "viz": false
-              },
-              "insertNulls": false,
-              "lineInterpolation": "linear",
-              "lineWidth": 1,
-              "pointSize": 5,
-              "scaleDistribution": {
-                "type": "linear"
-              },
-              "showPoints": "auto",
-              "spanNulls": false,
-              "stacking": {
-                "group": "A",
-                "mode": "none"
-              },
-              "thresholdsStyle": {
-                "mode": "off"
-              }
-            },
-            "mappings": [],
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                },
-                {
-                  "color": "red",
-                  "value": 80
-                }
-              ]
-            },
-            "unit": "s"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 12,
-          "y": 20
-        },
-        "id": 7,
-        "options": {
-          "legend": {
-            "calcs": [],
-            "displayMode": "list",
-            "placement": "bottom",
-            "showLegend": true
-          },
-          "tooltip": {
-            "hideZeros": false,
-            "mode": "single",
-            "sort": "none"
-          }
-        },
-        "pluginVersion": "11.5.1",
-        "targets": [
-          {
-            "disableTextWrap": false,
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.25, sum by(le) (rate(matching_duration_bucket[$__rate_interval])))",
-            "fullMetaSearch": false,
-            "includeNullMetadata": false,
-            "legendFormat": "P25",
-            "range": true,
-            "refId": "A",
-            "useBackend": false
-          },
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "aef7vvr9tex34d"
-            },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.50, sum by(le) (rate(matching_duration_bucket[$__rate_interval])))",
-            "hide": false,
-            "instant": false,
-            "legendFormat": "P50",
-            "range": true,
-            "refId": "B"
-          },
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "aef7vvr9tex34d"
-            },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.75, sum by(le) (rate(matching_duration_bucket[$__rate_interval])))",
-            "hide": false,
-            "instant": false,
-            "legendFormat": "P75",
-            "range": true,
-            "refId": "C"
-          },
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "aef7vvr9tex34d"
-            },
-            "editorMode": "code",
-            "expr": "histogram_quantile(0.95, sum by(le) (rate(matching_duration_bucket[$__rate_interval])))",
-            "hide": false,
-            "instant": false,
-            "legendFormat": "P95",
-            "range": true,
-            "refId": "D"
-          }
-        ],
-        "title": "Matching Duration Percentiles",
-        "type": "timeseries"
-      },
-      {
-        "collapsed": false,
-        "gridPos": {
-          "h": 1,
-          "w": 24,
-          "x": 0,
-          "y": 28
-        },
-        "id": 5,
-        "panels": [],
-        "title": "Row title",
-        "type": "row"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "aef7vvr9tex34d"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "custom": {
-              "fillOpacity": 80,
-              "gradientMode": "none",
-              "hideFrom": {
-                "legend": false,
-                "tooltip": false,
-                "viz": false
-              },
-              "lineWidth": 1,
-              "stacking": {
-                "group": "A",
-                "mode": "none"
-              }
-            },
-            "mappings": [],
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            }
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 0,
-          "y": 29
-        },
-        "id": 11,
-        "options": {
-          "bucketSize": 1,
-          "combine": true,
-          "legend": {
-            "calcs": [],
-            "displayMode": "list",
-            "placement": "bottom",
-            "showLegend": true
-          },
-          "tooltip": {
-            "hideZeros": false,
-            "mode": "single",
-            "sort": "none"
-          }
-        },
-        "pluginVersion": "11.5.1",
-        "targets": [
-          {
-            "disableTextWrap": false,
-            "editorMode": "builder",
-            "expr": "sell_order_price_bucket",
-            "format": "heatmap",
-            "fullMetaSearch": false,
-            "includeNullMetadata": true,
-            "interval": "",
-            "legendFormat": "{{le}}",
-            "range": true,
-            "refId": "A",
-            "useBackend": false
-          }
-        ],
-        "title": "Asks",
-        "type": "histogram"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "aef7vvr9tex34d"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "custom": {
-              "fillOpacity": 80,
-              "gradientMode": "none",
-              "hideFrom": {
-                "legend": false,
-                "tooltip": false,
-                "viz": false
-              },
-              "lineWidth": 1,
-              "stacking": {
-                "group": "A",
-                "mode": "none"
-              }
-            },
-            "mappings": [],
-            "thresholds": {
-              "mode": "absolute",
-              "steps": [
-                {
-                  "color": "green",
-                  "value": null
-                }
-              ]
-            },
-            "unit": "none"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 12,
-          "y": 29
-        },
-        "id": 10,
-        "options": {
-          "bucketSize": 1,
-          "combine": true,
-          "legend": {
-            "calcs": [],
-            "displayMode": "list",
-            "placement": "bottom",
-            "showLegend": true
-          },
-          "tooltip": {
-            "hideZeros": false,
-            "mode": "single",
-            "sort": "none"
-          }
-        },
-        "pluginVersion": "11.5.1",
-        "targets": [
-          {
-            "disableTextWrap": false,
-            "editorMode": "builder",
-            "exemplar": false,
-            "expr": "buy_order_price_bucket",
-            "format": "heatmap",
-            "fullMetaSearch": false,
-            "includeNullMetadata": true,
-            "instant": false,
-            "interval": "",
-            "legendFormat": "{{le}}",
-            "range": true,
-            "refId": "A",
-            "useBackend": false
-          }
-        ],
-        "title": "Bids",
-        "type": "histogram"
       }
     ],
     "preload": false,
@@ -821,13 +593,13 @@
       "list": []
     },
     "time": {
-      "from": "now-15m",
+      "from": "now-5m",
       "to": "now"
     },
     "timepicker": {},
     "timezone": "browser",
     "title": "New dashboard",
     "uid": "bef7w5bm3igowa",
-    "version": 37,
+    "version": 47,
     "weekStart": ""
   }
