@@ -54,10 +54,7 @@ impl Orderbook {
             false => vec![],
         };
 
-        if order.type_ == OrderType::Normal
-            && order.remaining_quantity > 0
-            && (order.initial_quantity - order.remaining_quantity) >= order.minimum_quantity
-        {
+        if order.type_ == OrderType::Normal && order.remaining_quantity > 0 {
             self.insert_order(order)
         }
 
@@ -116,6 +113,11 @@ impl Orderbook {
                         .expect("Order should never be in price level but not in orders");
 
                     let quantity = min(order.remaining_quantity, opposing_order.remaining_quantity);
+
+                    if quantity < opposing_order.minimum_quantity {
+                        continue;
+                    }
+
                     order.virtual_remaining_quantity -= quantity;
                     opposing_order.virtual_remaining_quantity -= quantity;
 
@@ -542,9 +544,8 @@ mod tests {
 
         assert!(first_trades.is_empty());
         assert!(second_trades.is_empty());
-        assert_eq!(orderbook.orders.len(), 1);
-        assert_empty_asks(&orderbook);
         assert_book_has_order(&orderbook, &buy_order.id, &buy_order.side, &1, &price);
+        assert_book_has_order(&orderbook, &sell_order.id, &sell_order.side, &2, &price);
     }
 
     #[test]
@@ -581,5 +582,47 @@ mod tests {
             }
         );
         assert_empty_book(&orderbook)
+    }
+
+    #[test]
+    fn resting_order_not_filled_when_min_quantity_not_met() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+
+        let buy_order_1 = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 5);
+        let buy_order_2 = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 1, 0);
+
+        let first_trades = orderbook.match_order(buy_order_1).unwrap();
+        let second_trades = orderbook.match_order(buy_order_2).unwrap();
+        let third_trades = orderbook.match_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert!(second_trades.is_empty());
+
+        assert_eq!(
+            third_trades,
+            [Trade {
+                bid: TradeInfo {
+                    order_id: buy_order_2.id,
+                    price,
+                    quantity: 1
+                },
+                ask: TradeInfo {
+                    order_id: sell_order.id,
+                    price,
+                    quantity: 1
+                }
+            },]
+        );
+
+        assert_book_has_order(
+            &orderbook,
+            &buy_order_1.id,
+            &buy_order_1.side,
+            &buy_order_1.remaining_quantity,
+            &price,
+        );
+        assert_empty_asks(&orderbook);
     }
 }
