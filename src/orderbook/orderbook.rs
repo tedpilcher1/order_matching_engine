@@ -5,7 +5,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
-    metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER},
+    metrics::{MATCHING_DURATION, ORDERS_FILLED_COUNTER, ORDER_COUNTER, TRADE_COUNTER},
     web_server::CancelRequestType,
 };
 
@@ -56,6 +56,10 @@ impl Orderbook {
 
         if order.type_ == OrderType::Normal && order.remaining_quantity > 0 {
             self.insert_order(order)
+        }
+
+        if order.remaining_quantity == 0 {
+            ORDERS_FILLED_COUNTER.inc();
         }
 
         Ok(trades)
@@ -153,6 +157,7 @@ impl Orderbook {
 
             // TODO: Can unify removal of order here with cancel order method
             if opposing_order.remaining_quantity == 0 {
+                ORDERS_FILLED_COUNTER.inc();
                 match opposing_order.side {
                     OrderSide::Buy => self
                         .bid_levels
