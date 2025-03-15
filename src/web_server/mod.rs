@@ -52,7 +52,6 @@ impl TryFrom<TradeRequest> for Order {
             price: trade_request.price,
             initial_quantity: trade_request.quantity,
             remaining_quantity: trade_request.quantity,
-            minimum_quantity: trade_request.minimum_quantity,
         })
     }
 }

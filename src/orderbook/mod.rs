@@ -26,44 +26,18 @@ pub struct Order {
     pub price: Price,
     pub initial_quantity: Quantity,
     pub remaining_quantity: Quantity,
-    pub minimum_quantity: Quantity,
 }
 
 impl Order {
-    pub fn new(
-        type_: OrderType,
-        side: OrderSide,
-        price: Price,
-        quantity: Quantity,
-        minimum_quantity: Quantity,
-    ) -> Option<Self> {
-        if minimum_quantity > quantity {
-            return None;
-        }
-
-        Some(Self {
+    pub fn new(type_: OrderType, side: OrderSide, price: Price, quantity: Quantity) -> Self {
+        Self {
             type_,
             id: Uuid::new_v4(),
             side,
             price,
             initial_quantity: quantity,
             remaining_quantity: quantity,
-            minimum_quantity: quantity,
-        })
-    }
-
-    fn get_filled_quantity(&self) -> Quantity {
-        self.initial_quantity - self.remaining_quantity
-    }
-
-    fn fill(&mut self, quantity: Quantity) -> Result<(), ProcessTradeError> {
-        if quantity > self.remaining_quantity {
-            return Err(ProcessTradeError::FillQuantityHigherThanRemaining);
         }
-
-        self.remaining_quantity -= quantity;
-
-        Ok(())
     }
 }
 
@@ -79,27 +53,15 @@ pub enum OrderSide {
     Sell,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct TradeInfo {
     order_id: Uuid,
     price: Price,
     quantity: Quantity,
 }
 
-impl From<(&Order, Quantity)> for TradeInfo {
-    fn from(value: (&Order, Quantity)) -> Self {
-        let order = value.0;
-        let quantity = value.1;
-        Self {
-            order_id: order.id,
-            price: order.price,
-            quantity,
-        }
-    }
-}
-
 /// matched order, aggregate of bid and ask
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Trade {
     bid: TradeInfo,
     ask: TradeInfo,
