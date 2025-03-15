@@ -1,9 +1,13 @@
 use std::{cmp::min, collections::HashMap};
 
 use anyhow::{bail, Result};
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::{metrics::ORDER_COUNTER, web_server::CancelRequestType};
+use crate::{
+    metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER},
+    web_server::CancelRequestType,
+};
 
 use super::{
     order_levels::{AskOrderLevels, BidOrderLevels, OrderLevels},
@@ -40,7 +44,13 @@ impl Orderbook {
         }
 
         let trades = match self.can_match_order(&order) {
-            true => self.internal_match_order(&mut order),
+            true => {
+                let start_time = Utc::now().timestamp();
+                let trades = self.internal_match_order(&mut order);
+                let end_time = Utc::now().timestamp();
+                MATCHING_DURATION.observe((end_time - start_time) as f64);
+                trades
+            }
             false => vec![],
         };
 
@@ -125,6 +135,7 @@ impl Orderbook {
                         },
                     };
                     trades.push(trade);
+                    TRADE_COUNTER.inc();
                 }
             }
         }
