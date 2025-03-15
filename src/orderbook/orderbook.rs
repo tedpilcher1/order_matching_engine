@@ -1,18 +1,13 @@
 use std::{cmp::min, collections::HashMap};
 
-use anyhow::{anyhow, Context, Result};
-use chrono::Utc;
+use anyhow::{bail, Result};
 use uuid::Uuid;
 
-use crate::{
-    metrics::{MATCHING_DURATION, ORDER_COUNTER, TRADE_COUNTER},
-    web_server::CancelRequestType,
-};
+use crate::{metrics::ORDER_COUNTER, web_server::CancelRequestType};
 
 use super::{
     order_levels::{AskOrderLevels, BidOrderLevels, OrderLevels},
-    MinQuantityNotMetTypes, Order, OrderSide, OrderType, Price, ProcessTradeError, Quantity, Trade,
-    TradeInfo,
+    Order, OrderSide, OrderType, Price, Trade, TradeInfo,
 };
 
 /// Map to reresents bids and asks
@@ -31,6 +26,142 @@ impl Orderbook {
             bid_levels: BidOrderLevels::new(),
             orders: HashMap::new(),
         }
+    }
+
+    pub fn match_order(&mut self, mut order: Order) -> Result<Vec<Trade>> {
+        ORDER_COUNTER.inc();
+
+        if self.orders.contains_key(&order.id) {
+            bail!("Order id already in use")
+        }
+
+        let trades = match self.can_match_order(&order) {
+            true => self.internal_match_order(&mut order),
+            false => vec![],
+        };
+
+        if order.type_ == OrderType::Normal && order.remaining_quantity > 0 {
+            self.insert_order(order)
+        }
+
+        Ok(trades)
+    }
+
+    fn can_match_order(&self, order: &Order) -> bool {
+        match order.side {
+            OrderSide::Buy => {
+                if let Some(best_opposing_price) = self.ask_levels.get_best_price() {
+                    return best_opposing_price <= &order.price;
+                }
+            }
+            OrderSide::Sell => {
+                if let Some(best_opposing_price) = self.bid_levels.get_best_price() {
+                    return best_opposing_price >= &order.price;
+                }
+            }
+        }
+        false
+    }
+
+    fn internal_match_order(&mut self, order: &mut Order) -> Vec<Trade> {
+        let mut trades = vec![];
+
+        let price_levels = match order.side {
+            OrderSide::Buy => self.ask_levels.get_prices(),
+            OrderSide::Sell => self.bid_levels.get_prices(),
+        };
+
+        for price_level in price_levels {
+            // if can't match at price level => break from both loops
+            // if order remaining quantity == 0 => break
+            if order.remaining_quantity == 0 {
+                break;
+            }
+
+            let opposing_orders = match order.side {
+                OrderSide::Buy => self.ask_levels.get_orders(price_level),
+                OrderSide::Sell => self.bid_levels.get_orders(price_level),
+            };
+
+            if let Some(opposing_orders) = opposing_orders {
+                for opposing_order_id in opposing_orders {
+                    if order.remaining_quantity == 0 {
+                        break;
+                    }
+
+                    let opposing_order = self
+                        .orders
+                        .get_mut(opposing_order_id)
+                        .expect("Order should never be in price level but not in orders");
+
+                    let quantity = min(order.remaining_quantity, opposing_order.remaining_quantity);
+                    order.remaining_quantity -= quantity;
+                    opposing_order.remaining_quantity -= quantity;
+
+                    let order_trade_info = TradeInfo {
+                        order_id: order.id,
+                        price: order.price,
+                        quantity,
+                    };
+
+                    let opposing_order_trade_info = TradeInfo {
+                        order_id: *opposing_order_id,
+                        price: *price_level,
+                        quantity,
+                    };
+
+                    let trade = match order.side {
+                        OrderSide::Buy => Trade {
+                            bid: order_trade_info,
+                            ask: opposing_order_trade_info,
+                        },
+                        OrderSide::Sell => Trade {
+                            bid: opposing_order_trade_info,
+                            ask: order_trade_info,
+                        },
+                    };
+                    trades.push(trade);
+                }
+            }
+        }
+        // remove orders with 0 remaining quantity
+        for trade in &trades {
+            let opposing_order_id = match order.side {
+                OrderSide::Buy => trade.ask.order_id,
+                OrderSide::Sell => trade.bid.order_id,
+            };
+
+            let opposing_order = self
+                .orders
+                .get(&opposing_order_id)
+                .expect("Order shouldn't have been removed yet");
+
+            // TODO: Can unify removal of order here with cancel order method
+            if opposing_order.remaining_quantity == 0 {
+                match opposing_order.side {
+                    OrderSide::Buy => self
+                        .bid_levels
+                        .remove_order(&trade.bid.price, &opposing_order_id),
+                    OrderSide::Sell => self
+                        .ask_levels
+                        .remove_order(&trade.ask.price, &opposing_order_id),
+                };
+
+                self.orders.remove(&opposing_order_id);
+            }
+        }
+        self.ask_levels.remove_empty_levels();
+        self.bid_levels.remove_empty_levels();
+
+        trades
+    }
+
+    fn insert_order(&mut self, order: Order) {
+        match order.side {
+            OrderSide::Buy => self.bid_levels.insert_order(order.price, order.id),
+            OrderSide::Sell => self.ask_levels.insert_order(order.price, order.id),
+        }
+        self.orders.insert(order.id, order);
     }
 
     /// Modifies an order, equivalent to cancel + add
@@ -63,7 +194,6 @@ impl Orderbook {
                         price: order.price,
                         initial_quantity: remaining_quantity,
                         remaining_quantity,
-                        minimum_quantity: cancelled_order.minimum_quantity,
                     };
 
                     let _ = self.insert_order(fresh_order);

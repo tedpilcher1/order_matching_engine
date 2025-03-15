@@ -23,7 +23,7 @@ fn worker_thread(receiver: Receiver<OrderRequest>) {
             match order_request {
                 OrderRequest::Trade(trade_request) => {
                     if let Ok(order_request) = Order::try_from(trade_request) {
-                        let _ = orderbook.insert_order(order_request);
+                        let _ = orderbook.match_order(order_request);
                     }
                 }
                 OrderRequest::Cancel(cancel_request_type, order_id) => {
