@@ -225,322 +225,252 @@ impl Orderbook {
 
         None
     }
-
-    pub fn insert_order(&mut self, order: Order) -> Result<Vec<Trade>> {
-        ORDER_COUNTER.inc();
-
-        if self.orders.contains_key(&order.id) {
-            return Err(anyhow!("Order id already in use"));
-        }
-
-        let _ = self.orders.insert(order.id, order);
-
-        match &order.side {
-            OrderSide::Buy => self.bid_levels.insert_order(order.price, order.id),
-            OrderSide::Sell => self.ask_levels.insert_order(order.price, order.id),
-        }
-
-        let res = match self.can_match(&order.side, &order.price) {
-            true => {
-                let start_time = Utc::now();
-                let res = self.match_orders();
-                let end_time = Utc::now();
-                MATCHING_DURATION.observe((end_time - start_time).num_seconds() as f64);
-                res?
-            }
-            false => vec![],
-        };
-
-        self.handle_order_type(&order.type_, &order.id)?;
-
-        Ok(res)
-    }
-
-    fn handle_order_type(&mut self, order_type: &OrderType, order_id: &Uuid) -> Result<()> {
-        match order_type {
-            OrderType::Kill => {
-                let _ = self.cancel_order(CancelRequestType::Internal, *order_id);
-            }
-            OrderType::Normal => {}
-        }
-
-        Ok(())
-    }
-
-    fn can_match(&mut self, side: &OrderSide, price: &Price) -> bool {
-        match side {
-            OrderSide::Buy => self
-                .ask_levels
-                .get_best_price()
-                .map_or(false, |best_price| price >= best_price),
-            OrderSide::Sell => self
-                .bid_levels
-                .get_best_price()
-                .map_or(false, |best_price| price <= best_price),
-        }
-    }
-
-    // fn process_trade(bid: &mut Order, ask: &mut Order) -> Result<Trade, ProcessTradeError> {
-    //     if ask.price != bid.price {
-    //         return Err(ProcessTradeError::PriceDiscrepancy);
-    //     }
-
-    //     let quantity = min(ask.remaining_quantity, bid.remaining_quantity);
-
-    //     if quantity < ask.minimum_quantity || quantity < bid.minimum_quantity {
-    //         let mut quantity_errors = vec![];
-    //         if quantity < ask.minimum_quantity {
-    //             quantity_errors.push(MinQuantityNotMetTypes::Ask);
-    //         }
-    //         if quantity < bid.minimum_quantity {
-    //             quantity_errors.push(MinQuantityNotMetTypes::Bid);
-    //         }
-    //         return Err(ProcessTradeError::MinQuantityNotMet(quantity_errors));
-    //     }
-
-    //     bid.fill(quantity)?;
-    //     ask.fill(quantity)?;
-
-    //     let trade = Trade {
-    //         bid: (*bid, quantity).into(),
-    //         ask: (*ask, quantity).into(),
-    //     };
-
-    //     TRADE_COUNTER.inc();
-
-    //     Ok(trade)
-    // }
-
-    fn calc_trade(bid: &Order, ask: &Order) -> Result<Quantity, ProcessTradeError> {
-        if ask.price != bid.price {
-            return Err(ProcessTradeError::PriceDiscrepancy);
-        }
-
-        let quantity = min(ask.remaining_quantity, bid.remaining_quantity);
-
-        if quantity < ask.minimum_quantity || quantity < bid.minimum_quantity {
-            let mut quantity_errors = vec![];
-            if quantity < ask.minimum_quantity {
-                quantity_errors.push(MinQuantityNotMetTypes::Ask);
-            }
-            if quantity < bid.minimum_quantity {
-                quantity_errors.push(MinQuantityNotMetTypes::Bid);
-            }
-            return Err(ProcessTradeError::MinQuantityNotMet(quantity_errors));
-        }
-
-        Ok(quantity)
-    }
-
-    fn match_orders_new(&mut self) -> Result<Vec<Trade>> {
-        let mut trades = vec![];
-
-        let mut bid_prices = self.bid_levels.get_prices().into_iter();
-        let mut ask_prices = self.ask_levels.get_prices().into_iter();
-
-        let mut best_bid_price = bid_prices.next();
-        let mut best_ask_price = ask_prices.next();
-
-        loop {
-            match (best_bid_price, best_ask_price) {
-                (Some(best_bid_price), Some(best_ask_price)) => {
-                    // if no further matches are possible break
-                    if best_ask_price > best_bid_price {
-                        break;
-                    }
-
-                    // attempt to match order at current price levels
-                }
-                _ => break,
-            }
-        }
-
-        Ok(trades)
-    }
-
-    // TODO: This should return some error signifying that either bid_prices.next() or ask_prices.next()
-    fn match_orders_at_price_levels(
-        &mut self,
-        best_bid_price: &Price,
-        best_ask_price: &Price,
-    ) -> Result<Trade> {
-        let mut ask_ids = self
-            .ask_levels
-            .get_orders(best_ask_price)
-            .context("Should have orders")?
-            .into_iter();
-
-        let mut bid_ids = self
-            .bid_levels
-            .get_orders(best_bid_price)
-            .context("Should have orders")?
-            .into_iter();
-
-        let mut bid_id = bid_ids.next().context("")?;
-        let mut ask_id = ask_ids.next().context("")?;
-
-        todo!()
-    }
-
-    // Todo: clean up order levels after rather than during?
-    fn match_orders(&mut self) -> Result<Vec<Trade>> {
-        let mut trades = vec![];
-
-        let mut bid_level_offset: usize = 0;
-        let mut ask_level_offset: usize = 0;
-
-        let ask_prices = self.ask_levels.get_prices();
-        let bid_prices = self.bid_levels.get_prices();
-
-        loop {
-            let best_bid_price: &i64 = *bid_prices
-                .get(bid_level_offset)
-                .context("Should never be out of range")?;
-            let best_ask_price: &i64 = *ask_prices
-                .get(ask_level_offset)
-                .context("Should never be out of range")?;
-
-            // if no further trades can be made, break
-            if best_ask_price > best_ask_price {
-                break;
-            }
-
-            // get iterator to bid & ask orders
-            let mut ask_ids = self
-                .ask_levels
-                .get_orders(best_ask_price)
-                .context("Should have orders")?
-                .into_iter();
-
-            let mut bid_ids = self
-                .bid_levels
-                .get_orders(best_bid_price)
-                .context("Should have orders")?
-                .into_iter();
-
-            let mut bid_id = bid_ids.next().context("")?;
-            let mut ask_id = ask_ids.next().context("")?;
-
-            loop {
-                let bid = self.orders.get(bid_id).context("")?;
-                let ask = self.orders.get(ask_id).context("")?;
-
-                let trade_quantity = Orderbook::calc_trade(bid, ask);
-
-                match trade_quantity {
-                    Ok(quantity) => {
-                        let bid_trade_info: TradeInfo = (bid, quantity).into();
-                        let ask_trade_info: TradeInfo = (ask, quantity).into();
-
-                        let mutable_bid = self.orders.get_mut(bid_id).context("")?;
-                        let _ = mutable_bid.fill(quantity);
-                        let mutable_ask = self.orders.get_mut(ask_id).context("")?;
-                        let _ = mutable_ask.fill(quantity);
-
-                        trades.push(Trade {
-                            bid: bid_trade_info,
-                            ask: ask_trade_info,
-                        });
-
-                        TRADE_COUNTER.inc();
-                    }
-                    Err(e) => match e {
-                        ProcessTradeError::MinQuantityNotMet(errors) => {
-                            for error in errors {
-                                match error {
-                                    MinQuantityNotMetTypes::Ask => match ask_ids.next() {
-                                        Some(new_ask_id) => ask_id = new_ask_id,
-                                        None => {
-                                            ask_level_offset += 1;
-                                            break;
-                                        }
-                                    },
-                                    MinQuantityNotMetTypes::Bid => match bid_ids.next() {
-                                        Some(new_bid_id) => bid_id = new_bid_id,
-                                        None => {
-                                            bid_level_offset += 1;
-                                            break;
-                                        }
-                                    },
-                                }
-                            }
-                        }
-                        _ => return Err(anyhow!("Process trade error")),
-                    },
-                }
-            }
-        }
-
-        Ok(trades)
-    }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use crate::orderbook::Quantity;
 
-//     fn assert_empty_orderbook(orderbook: &Orderbook) {
-//         assert!(orderbook.bid_levels.is_empty());
-//         assert!(orderbook.ask_levels.is_empty())
-//     }
+    use super::*;
 
-//     #[test]
-//     fn basic_order_match() {
-//         let mut orderbook = Orderbook::new();
-//         let price = 10;
-//         let quantity = 1;
+    fn assert_empty_book(orderbook: &Orderbook) {
+        assert!(orderbook.orders.is_empty());
+        assert!(orderbook.ask_levels.get_prices().is_empty());
+        assert!(orderbook.bid_levels.get_prices().is_empty());
+    }
 
-//         let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity, 0).unwrap();
-//         let sell_order =
-//             Order::new(OrderType::Normal, OrderSide::Sell, price, quantity, 0).unwrap();
+    fn assert_book_has_order(
+        orderbook: &Orderbook,
+        order_id: &Uuid,
+        order_side: &OrderSide,
+        remaining_quantity: &Quantity,
+        price: &Price,
+    ) {
+        let order = orderbook.orders.get(order_id).unwrap();
+        assert_eq!(order.remaining_quantity, *remaining_quantity);
+        match order_side {
+            OrderSide::Buy => assert!(orderbook
+                .bid_levels
+                .get_orders(price)
+                .unwrap()
+                .contains(order_id)),
 
-//         let first_trades = orderbook.add_order(buy_order).unwrap();
-//         let second_trades = orderbook.add_order(sell_order).unwrap();
+            OrderSide::Sell => assert!(orderbook
+                .ask_levels
+                .get_orders(price)
+                .unwrap()
+                .contains(order_id)),
+        }
+    }
 
-//         assert!(first_trades.is_empty());
+    fn assert_empty_asks(orderbook: &Orderbook) {
+        assert!(orderbook.ask_levels.get_prices().is_empty())
+    }
 
-//         let trade = second_trades.first().unwrap();
-//         assert_eq!(trade.ask.price, price);
-//         assert_eq!(trade.ask.quantity, quantity);
+    fn assert_empty_bids(orderbook: &Orderbook) {
+        assert!(orderbook.bid_levels.get_prices().is_empty())
+    }
 
-//         assert_eq!(trade.bid.price, price);
-//         assert_eq!(trade.bid.quantity, quantity);
+    #[test]
+    fn can_insert_order() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+        let quantity = 1;
 
-//         assert_empty_orderbook(&orderbook)
-//     }
+        let order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity);
+        let trades = orderbook.match_order(order).unwrap();
 
-//     #[test]
-//     fn partial_order_match() {
-//         let mut orderbook = Orderbook::new();
-//         let price = 10;
-//         let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 5, 0).unwrap();
-//         let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 10, 0).unwrap();
+        assert_eq!(trades.len(), 0);
+        assert_book_has_order(&orderbook, &order.id, &order.side, &quantity, &price);
+        assert_empty_asks(&orderbook);
+    }
 
-//         let first_trades = orderbook.add_order(buy_order).unwrap();
-//         let second_trades = orderbook.add_order(sell_order).unwrap();
+    #[test]
+    fn cannot_match_orders_when_ask_exceeds_bid() {
+        let mut orderbook = Orderbook::new();
 
-//         assert!(first_trades.is_empty());
+        let quantity = 1;
+        let bid_price = 1;
+        let ask_price = 2;
 
-//         let trade = second_trades.first().unwrap();
-//         assert_eq!(trade.ask.price, price);
-//         assert_eq!(trade.ask.quantity, 5);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, bid_price, quantity);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, ask_price, quantity);
 
-//         assert_eq!(trade.bid.price, price);
-//         assert_eq!(trade.bid.quantity, 5);
+        let first_trades = orderbook.match_order(buy_order).unwrap();
+        let second_trades = orderbook.match_order(sell_order).unwrap();
 
-//         assert!(orderbook.bid_levels.is_empty());
-//         assert!(!orderbook.ask_levels.is_empty());
-//     }
+        assert!(first_trades.is_empty());
+        assert!(second_trades.is_empty());
 
-//     #[test]
-//     fn fill_or_kill_order() {
-//         let mut orderbook = Orderbook::new();
-//         let order = Order::new(OrderType::Kill, OrderSide::Buy, 1, 1, 0).unwrap();
+        assert_book_has_order(
+            &orderbook,
+            &buy_order.id,
+            &buy_order.side,
+            &quantity,
+            &bid_price,
+        );
 
-//         let trades = orderbook.add_order(order).unwrap();
+        assert_book_has_order(
+            &orderbook,
+            &sell_order.id,
+            &sell_order.side,
+            &quantity,
+            &ask_price,
+        );
+    }
 
-//         assert!(trades.is_empty());
+    #[test]
+    fn can_kill_order() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+        let quantity = 1;
 
-//         assert_empty_orderbook(&orderbook)
-//     }
-// }
+        let order = Order::new(OrderType::Kill, OrderSide::Buy, price, quantity);
+        let trades = orderbook.match_order(order).unwrap();
+
+        assert!(trades.is_empty());
+        assert_empty_book(&orderbook);
+    }
+
+    #[test]
+    fn can_match_symmetric_opposing_orders() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+        let quantity = 1;
+
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, quantity);
+
+        let first_trades = orderbook.match_order(buy_order).unwrap();
+        let second_trades = orderbook.match_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert_eq!(
+            second_trades.first().unwrap(),
+            &Trade {
+                bid: TradeInfo {
+                    order_id: buy_order.id,
+                    price,
+                    quantity,
+                },
+                ask: TradeInfo {
+                    order_id: sell_order.id,
+                    price,
+                    quantity,
+                }
+            }
+        );
+        assert_empty_book(&orderbook);
+    }
+
+    #[test]
+    fn can_partially_fill_orders() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 1);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 2);
+
+        let first_trades = orderbook.match_order(buy_order).unwrap();
+        let second_trades = orderbook.match_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert_eq!(
+            second_trades.first().unwrap(),
+            &Trade {
+                bid: TradeInfo {
+                    order_id: buy_order.id,
+                    price,
+                    quantity: 1
+                },
+                ask: TradeInfo {
+                    order_id: sell_order.id,
+                    price,
+                    quantity: 1
+                }
+            }
+        );
+        assert_empty_bids(&orderbook);
+        assert_book_has_order(&orderbook, &sell_order.id, &sell_order.side, &1, &price);
+    }
+
+    #[test]
+    fn can_match_orders_with_different_prices() {
+        let mut orderbook = Orderbook::new();
+        let quantity = 1;
+        let buy_price = 2;
+        let sell_price = 1;
+
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, buy_price, quantity);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, sell_price, quantity);
+
+        let first_trades = orderbook.match_order(buy_order).unwrap();
+        let second_trades = orderbook.match_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert_eq!(
+            second_trades.first().unwrap(),
+            &Trade {
+                bid: TradeInfo {
+                    order_id: buy_order.id,
+                    price: buy_price,
+                    quantity,
+                },
+                ask: TradeInfo {
+                    order_id: sell_order.id,
+                    price: sell_price,
+                    quantity,
+                }
+            }
+        );
+        assert_empty_book(&orderbook);
+    }
+
+    #[test]
+    fn can_fill_with_multiple_opposing_orders() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+
+        let buy_order_1 = Order::new(OrderType::Normal, OrderSide::Buy, price, 1);
+        let buy_order_2 = Order::new(OrderType::Normal, OrderSide::Buy, price, 2);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 3);
+
+        let first_trades = orderbook.match_order(buy_order_1).unwrap();
+        let second_trades = orderbook.match_order(buy_order_2).unwrap();
+        let third_trades = orderbook.match_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert!(second_trades.is_empty());
+        assert_eq!(
+            third_trades,
+            [
+                Trade {
+                    bid: TradeInfo {
+                        order_id: buy_order_1.id,
+                        price,
+                        quantity: 1
+                    },
+                    ask: TradeInfo {
+                        order_id: sell_order.id,
+                        price,
+                        quantity: 1
+                    }
+                },
+                Trade {
+                    bid: TradeInfo {
+                        order_id: buy_order_2.id,
+                        price,
+                        quantity: 2
+                    },
+                    ask: TradeInfo {
+                        order_id: sell_order.id,
+                        price,
+                        quantity: 2
+                    }
+                }
+            ]
+        );
+
+        assert_empty_book(&orderbook);
+    }
+}
