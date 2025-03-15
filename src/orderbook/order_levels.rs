@@ -36,7 +36,7 @@ where
     fn insert_order(&mut self, key: K, order_id: Uuid) {
         self.levels
             .entry(key)
-            .or_insert_with(VecDeque::new)
+            .or_default()
             .push_back(order_id);
     }
 
@@ -63,8 +63,7 @@ where
 
     fn get_best_price(&self) -> Option<&K> {
         self.levels
-            .first_key_value()
-            .and_then(|key_value| Some(key_value.0))
+            .first_key_value().map(|key_value| key_value.0)
     }
 
     fn get_orders(&self, key: &K) -> Option<&VecDeque<Uuid>> {

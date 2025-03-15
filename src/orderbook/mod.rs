@@ -1,4 +1,3 @@
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -7,16 +6,6 @@ pub mod orderbook;
 
 type Price = i64;
 type Quantity = u64;
-
-struct LevelInfo {
-    price: Price,
-    quantity: Quantity,
-}
-
-struct OrderbookLevelInfo {
-    bids: Vec<LevelInfo>,
-    asks: Vec<LevelInfo>,
-}
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Order {

@@ -17,7 +17,7 @@ async fn modify_order_endpoint(
     REQUESTS_COUNTER.inc();
     match state
         .order_engine_sender
-        .send(OrderRequest::Modify(order_request.into_inner().into()))
+        .send(OrderRequest::Modify(order_request.into_inner()))
     {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
@@ -53,7 +53,7 @@ async fn create_order_endpoint(
 
     if state
         .order_engine_sender
-        .send(OrderRequest::Trade(trade_request.into()))
+        .send(OrderRequest::Trade(trade_request))
         .is_err()
     {
         return HttpResponse::InternalServerError().finish();

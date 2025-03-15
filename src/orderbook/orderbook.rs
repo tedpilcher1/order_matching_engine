@@ -7,7 +7,7 @@ use crate::{metrics::ORDER_COUNTER, web_server::CancelRequestType};
 
 use super::{
     order_levels::{AskOrderLevels, BidOrderLevels, OrderLevels},
-    Order, OrderSide, OrderType, Price, Trade, TradeInfo,
+    Order, OrderSide, OrderType, Trade, TradeInfo,
 };
 
 /// Map to reresents bids and asks
@@ -17,6 +17,12 @@ pub struct Orderbook {
     ask_levels: AskOrderLevels,
     bid_levels: BidOrderLevels,
     orders: HashMap<Uuid, Order>,
+}
+
+impl Default for Orderbook {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Orderbook {
@@ -196,7 +202,7 @@ impl Orderbook {
                         remaining_quantity,
                     };
 
-                    let _ = self.insert_order(fresh_order);
+                    self.insert_order(fresh_order);
                 }
             }
             // cannot modify side
@@ -229,7 +235,7 @@ impl Orderbook {
 
 #[cfg(test)]
 mod tests {
-    use crate::orderbook::Quantity;
+    use crate::orderbook::{Price, Quantity};
 
     use super::*;
 
