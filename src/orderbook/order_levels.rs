@@ -15,6 +15,7 @@ pub trait OrderLevels {
     fn get_prices(&self) -> Vec<&Price>;
     fn get_best_price(&self) -> Option<&Price>;
     fn get_orders(&self, price: &Price) -> Option<&VecDeque<Uuid>>;
+    fn remove_empty_levels(&mut self);
 }
 
 #[derive(Debug)]
@@ -106,6 +107,10 @@ impl OrderLevels for AskOrderLevels {
     fn get_orders(&self, price: &Price) -> Option<&VecDeque<Uuid>> {
         self.inner.get_orders(price)
     }
+
+    fn remove_empty_levels(&mut self) {
+        self.inner.levels.retain(|_, orders| !orders.is_empty());
+    }
 }
 
 #[derive(Debug)]
@@ -148,5 +153,9 @@ impl OrderLevels for BidOrderLevels {
 
     fn get_orders(&self, price: &Price) -> Option<&VecDeque<Uuid>> {
         self.inner.get_orders(&Reverse(*price))
+    }
+
+    fn remove_empty_levels(&mut self) {
+        self.inner.levels.retain(|_, orders| !orders.is_empty());
     }
 }
