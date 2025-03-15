@@ -214,6 +214,7 @@ impl Orderbook {
                         price: order.price,
                         initial_quantity: remaining_quantity,
                         remaining_quantity,
+                        minimum_quantity: cancelled_order.minimum_quantity,
                     };
 
                     self.insert_order(fresh_order);
@@ -297,7 +298,7 @@ mod tests {
         let price = 1;
         let quantity = 1;
 
-        let order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity);
+        let order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity, 0);
         let trades = orderbook.match_order(order).unwrap();
 
         assert_eq!(trades.len(), 0);
@@ -313,8 +314,8 @@ mod tests {
         let bid_price = 1;
         let ask_price = 2;
 
-        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, bid_price, quantity);
-        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, ask_price, quantity);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, bid_price, quantity, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, ask_price, quantity, 0);
 
         let first_trades = orderbook.match_order(buy_order).unwrap();
         let second_trades = orderbook.match_order(sell_order).unwrap();
@@ -345,7 +346,7 @@ mod tests {
         let price = 1;
         let quantity = 1;
 
-        let order = Order::new(OrderType::Kill, OrderSide::Buy, price, quantity);
+        let order = Order::new(OrderType::Kill, OrderSide::Buy, price, quantity, 0);
         let trades = orderbook.match_order(order).unwrap();
 
         assert!(trades.is_empty());
@@ -358,8 +359,8 @@ mod tests {
         let price = 1;
         let quantity = 1;
 
-        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity);
-        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, quantity);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, quantity, 0);
 
         let first_trades = orderbook.match_order(buy_order).unwrap();
         let second_trades = orderbook.match_order(sell_order).unwrap();
@@ -388,8 +389,8 @@ mod tests {
         let mut orderbook = Orderbook::new();
         let price = 1;
 
-        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 1);
-        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 2);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 2, 0);
 
         let first_trades = orderbook.match_order(buy_order).unwrap();
         let second_trades = orderbook.match_order(sell_order).unwrap();
@@ -421,8 +422,8 @@ mod tests {
         let buy_price = 2;
         let sell_price = 1;
 
-        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, buy_price, quantity);
-        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, sell_price, quantity);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, buy_price, quantity, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, sell_price, quantity, 0);
 
         let first_trades = orderbook.match_order(buy_order).unwrap();
         let second_trades = orderbook.match_order(sell_order).unwrap();
@@ -451,9 +452,9 @@ mod tests {
         let mut orderbook = Orderbook::new();
         let price = 1;
 
-        let buy_order_1 = Order::new(OrderType::Normal, OrderSide::Buy, price, 1);
-        let buy_order_2 = Order::new(OrderType::Normal, OrderSide::Buy, price, 2);
-        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 3);
+        let buy_order_1 = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 0);
+        let buy_order_2 = Order::new(OrderType::Normal, OrderSide::Buy, price, 2, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 3, 0);
 
         let first_trades = orderbook.match_order(buy_order_1).unwrap();
         let second_trades = orderbook.match_order(buy_order_2).unwrap();

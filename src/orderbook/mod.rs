@@ -15,10 +15,17 @@ pub struct Order {
     pub price: Price,
     pub initial_quantity: Quantity,
     pub remaining_quantity: Quantity,
+    pub minimum_quantity: Quantity,
 }
 
 impl Order {
-    pub fn new(type_: OrderType, side: OrderSide, price: Price, quantity: Quantity) -> Self {
+    pub fn new(
+        type_: OrderType,
+        side: OrderSide,
+        price: Price,
+        quantity: Quantity,
+        minimum_quantity: Quantity,
+    ) -> Self {
         Self {
             type_,
             id: Uuid::new_v4(),
@@ -26,6 +33,7 @@ impl Order {
             price,
             initial_quantity: quantity,
             remaining_quantity: quantity,
+            minimum_quantity,
         }
     }
 }
