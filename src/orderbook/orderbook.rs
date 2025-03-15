@@ -10,8 +10,6 @@ use super::{
     Order, OrderSide, OrderType, Trade, TradeInfo,
 };
 
-/// Map to reresents bids and asks
-/// bids desc (first/highest is best buy price), asks asc (first/lowest is best sell price)
 #[derive(Debug)]
 pub struct Orderbook {
     ask_levels: AskOrderLevels,
