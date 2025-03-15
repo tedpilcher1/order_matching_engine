@@ -16,6 +16,7 @@ pub struct Order {
     pub initial_quantity: Quantity,
     pub remaining_quantity: Quantity,
     pub minimum_quantity: Quantity,
+    pub virtual_remaining_quantity: Quantity,
 }
 
 impl Order {
@@ -34,6 +35,7 @@ impl Order {
             initial_quantity: quantity,
             remaining_quantity: quantity,
             minimum_quantity,
+            virtual_remaining_quantity: quantity,
         }
     }
 }

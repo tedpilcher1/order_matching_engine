@@ -54,7 +54,10 @@ impl Orderbook {
             false => vec![],
         };
 
-        if order.type_ == OrderType::Normal && order.remaining_quantity > 0 {
+        if order.type_ == OrderType::Normal
+            && order.remaining_quantity > 0
+            && (order.initial_quantity - order.remaining_quantity) >= order.minimum_quantity
+        {
             self.insert_order(order)
         }
 
@@ -113,8 +116,8 @@ impl Orderbook {
                         .expect("Order should never be in price level but not in orders");
 
                     let quantity = min(order.remaining_quantity, opposing_order.remaining_quantity);
-                    order.remaining_quantity -= quantity;
-                    opposing_order.remaining_quantity -= quantity;
+                    order.virtual_remaining_quantity -= quantity;
+                    opposing_order.virtual_remaining_quantity -= quantity;
 
                     let order_trade_info = TradeInfo {
                         order_id: order.id,
@@ -138,13 +141,23 @@ impl Orderbook {
                             ask: order_trade_info,
                         },
                     };
+
                     trades.push(trade);
-                    TRADE_COUNTER.inc();
                 }
             }
         }
-        // remove orders with 0 remaining quantity
-        for trade in &trades {
+
+        if (order.initial_quantity - order.virtual_remaining_quantity) >= order.minimum_quantity {
+            self.commit_trades(order, &trades);
+            trades
+        } else {
+            self.discard_trades(order, &trades);
+            vec![]
+        }
+    }
+
+    fn discard_trades(&mut self, order: &mut Order, trades: &Vec<Trade>) {
+        for trade in trades {
             let opposing_order_id = match order.side {
                 OrderSide::Buy => trade.ask.order_id,
                 OrderSide::Sell => trade.bid.order_id,
@@ -152,8 +165,27 @@ impl Orderbook {
 
             let opposing_order = self
                 .orders
-                .get(&opposing_order_id)
+                .get_mut(&opposing_order_id)
                 .expect("Order shouldn't have been removed yet");
+
+            opposing_order.virtual_remaining_quantity = opposing_order.remaining_quantity
+        }
+        order.virtual_remaining_quantity = order.remaining_quantity
+    }
+
+    fn commit_trades(&mut self, order: &mut Order, trades: &Vec<Trade>) {
+        for trade in trades {
+            let opposing_order_id = match order.side {
+                OrderSide::Buy => trade.ask.order_id,
+                OrderSide::Sell => trade.bid.order_id,
+            };
+
+            let opposing_order = self
+                .orders
+                .get_mut(&opposing_order_id)
+                .expect("Order shouldn't have been removed yet");
+
+            opposing_order.remaining_quantity = opposing_order.virtual_remaining_quantity;
 
             // TODO: Can unify removal of order here with cancel order method
             if opposing_order.remaining_quantity == 0 {
@@ -169,11 +201,12 @@ impl Orderbook {
 
                 self.orders.remove(&opposing_order_id);
             }
+            TRADE_COUNTER.inc();
         }
+
+        order.remaining_quantity = order.virtual_remaining_quantity;
         self.ask_levels.remove_empty_levels();
         self.bid_levels.remove_empty_levels();
-
-        trades
     }
 
     fn insert_order(&mut self, order: Order) {
@@ -214,6 +247,7 @@ impl Orderbook {
                         price: order.price,
                         initial_quantity: remaining_quantity,
                         remaining_quantity,
+                        virtual_remaining_quantity: remaining_quantity,
                         minimum_quantity: cancelled_order.minimum_quantity,
                     };
 
@@ -493,5 +527,59 @@ mod tests {
         );
 
         assert_empty_book(&orderbook);
+    }
+
+    #[test]
+    fn order_not_filled_when_min_quantity_not_met() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, price, 2, 2);
+
+        let first_trades = orderbook.match_order(buy_order).unwrap();
+        let second_trades = orderbook.match_order(sell_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert!(second_trades.is_empty());
+        assert_eq!(orderbook.orders.len(), 1);
+        assert_empty_asks(&orderbook);
+        assert_book_has_order(&orderbook, &buy_order.id, &buy_order.side, &1, &price);
+    }
+
+    #[test]
+    fn order_filled_when_min_quantity_met() {
+        let mut orderbook = Orderbook::new();
+        let price = 1;
+        let quantity = 2;
+
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, quantity, 0);
+        let sell_order = Order::new(
+            OrderType::Normal,
+            OrderSide::Sell,
+            price,
+            quantity,
+            quantity,
+        );
+
+        let first_trades = orderbook.match_order(buy_order).unwrap();
+        let second_trades = orderbook.match_order(sell_order).unwrap();
+        assert!(first_trades.is_empty());
+        assert_eq!(
+            second_trades.first().unwrap(),
+            &Trade {
+                bid: TradeInfo {
+                    order_id: buy_order.id,
+                    price,
+                    quantity,
+                },
+                ask: TradeInfo {
+                    order_id: sell_order.id,
+                    price,
+                    quantity,
+                }
+            }
+        );
+        assert_empty_book(&orderbook)
     }
 }
