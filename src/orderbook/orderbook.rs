@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::{
-    order_levels::{AskOrderLevels, BidOrderLevels, OrderLevels},
+    orderlevels::{AskOrderLevels, BidOrderLevels, OrderLevels},
     Order, OrderSide, OrderType, Trade, TradeInfo,
 };
 
