@@ -720,5 +720,43 @@ mod tests {
     }
 
     #[test]
-    fn modified_order_can_be_filled() {}
+    fn modified_order_can_be_filled() {
+        let mut orderbook = Orderbook::new(None);
+        let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, 1, 1, 0);
+        let sell_order = Order::new(OrderType::Normal, OrderSide::Sell, 2, 1, 0);
+
+        let first_trades = orderbook.match_order(buy_order).unwrap();
+        let second_trades = orderbook.match_order(sell_order).unwrap();
+
+        let modified_order = Order {
+            type_: sell_order.type_,
+            id: sell_order.id,
+            side: sell_order.side,
+            price: 1,
+            initial_quantity: 1,
+            remaining_quantity: 1,
+            minimum_quantity: 1,
+            virtual_remaining_quantity: 1,
+        };
+        let (cancelled_order, third_trades) = orderbook.modify_order(modified_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert!(second_trades.is_empty());
+        assert_eq!(sell_order, cancelled_order.order);
+        assert_trade(
+            &third_trades,
+            0,
+            TradeInfo {
+                order_id: buy_order.id,
+                price: 1,
+                quantity: 1,
+            },
+            TradeInfo {
+                order_id: sell_order.id,
+                price: 1,
+                quantity: 1,
+            },
+        );
+        assert_empty_book(&orderbook)
+    }
 }
