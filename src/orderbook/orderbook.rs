@@ -286,27 +286,27 @@ impl Orderbook {
             bail!("Cannot modify order type")
         }
 
+        if (existing_order.initial_quantity - existing_order.remaining_quantity)
+            > order.initial_quantity
+        {
+            bail!("Cannot modify quantity to lower than currently filled")
+        }
+
         let cancelled_order = self
             .cancel_order(CancelRequestType::Internal, order.id)
             .ok_or_else(|| anyhow::anyhow!("Could not cancel order"))?;
-
-        let remaining_quantity = order
-            .remaining_quantity
-            .abs_diff(cancelled_order.order.remaining_quantity);
 
         let fresh_order = Order {
             type_: order.type_,
             id: order.id,
             side: order.side,
             price: order.price,
-            initial_quantity: remaining_quantity,
-            remaining_quantity,
-            virtual_remaining_quantity: remaining_quantity,
+            initial_quantity: order.initial_quantity,
+            remaining_quantity: cancelled_order.order.remaining_quantity,
+            virtual_remaining_quantity: cancelled_order.order.remaining_quantity,
             minimum_quantity: cancelled_order.order.minimum_quantity,
         };
-
         let trades = self.match_order(fresh_order).unwrap_or_default();
-
         Ok((cancelled_order, trades))
     }
 
@@ -677,4 +677,48 @@ mod tests {
         );
         assert_empty_asks(&orderbook);
     }
+
+    #[test]
+    fn can_cancel_order() {
+        let mut orderbook = Orderbook::new(None);
+
+        let order = Order::new(OrderType::Normal, OrderSide::Buy, 1, 1, 0);
+        let trades = orderbook.match_order(order).unwrap();
+        let cancellation = orderbook
+            .cancel_order(CancelRequestType::External, order.id)
+            .unwrap();
+
+        assert!(trades.is_empty());
+        assert_eq!(cancellation.order, order);
+        assert_empty_book(&orderbook)
+    }
+
+    #[test]
+    fn can_modify_order() {
+        let mut orderbook = Orderbook::new(None);
+
+        let order = Order::new(OrderType::Normal, OrderSide::Buy, 1, 1, 0);
+        let first_trades = orderbook.match_order(order).unwrap();
+
+        let modified_order = Order {
+            type_: order.type_,
+            id: order.id,
+            side: order.side,
+            price: 2,
+            initial_quantity: 1,
+            remaining_quantity: 1,
+            minimum_quantity: 1,
+            virtual_remaining_quantity: 1,
+        };
+
+        let (cancelled_order, second_trades) = orderbook.modify_order(modified_order).unwrap();
+
+        assert!(first_trades.is_empty());
+        assert!(second_trades.is_empty());
+        assert_eq!(order, cancelled_order.order);
+        assert_book_has_order(&orderbook, &modified_order.id, &modified_order.side, &1, &2)
+    }
+
+    #[test]
+    fn modified_order_can_be_filled() {}
 }
