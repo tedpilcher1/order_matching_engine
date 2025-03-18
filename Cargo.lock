@@ -2267,6 +2267,7 @@ dependencies = [
  "rlt",
  "serde",
  "serde_json",
+ "socket2",
  "tokio",
  "uuid",
  "warp",
