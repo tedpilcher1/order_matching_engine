@@ -2,16 +2,18 @@ use std::{cmp::min, collections::HashMap};
 
 use anyhow::{bail, Result};
 use chrono::Utc;
+use crossbeam::channel::Sender;
 use uuid::Uuid;
 
 use crate::{
     metrics::{MATCHING_DURATION, ORDERS_FILLED_COUNTER, ORDER_COUNTER, TRADE_COUNTER},
-    web_server::CancelRequestType,
+    orderbook::CancelledOrder,
+    web_server::{CancelRequestType, OrderRequest},
 };
 
 use super::{
     orderlevels::{AskOrderLevels, BidOrderLevels, OrderLevels},
-    Order, OrderSide, OrderType, Trade, TradeInfo,
+    MarketDataUpdate, Order, OrderSide, OrderType, Trade, TradeInfo,
 };
 
 #[derive(Debug)]
@@ -19,24 +21,74 @@ pub struct Orderbook {
     ask_levels: AskOrderLevels,
     bid_levels: BidOrderLevels,
     orders: HashMap<Uuid, Order>,
+    market_data_update_sender: Option<Sender<MarketDataUpdate>>,
 }
 
 impl Default for Orderbook {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
 impl Orderbook {
-    pub fn new() -> Self {
+    pub fn new(market_data_update_sender: Option<Sender<MarketDataUpdate>>) -> Self {
         Self {
             ask_levels: AskOrderLevels::new(),
             bid_levels: BidOrderLevels::new(),
             orders: HashMap::new(),
+            market_data_update_sender,
         }
     }
 
-    pub fn match_order(&mut self, mut order: Order) -> Result<Vec<Trade>> {
+    /// Matches and handles trade request
+    ///
+    /// Only pub access to orderbook
+    ///
+    /// Sends series of market updates to
+    /// market update worker to expose
+    pub fn place_trade_request(
+        &mut self,
+        order_request: OrderRequest,
+    ) -> Result<Vec<MarketDataUpdate>> {
+        let market_updates: Vec<MarketDataUpdate> = match order_request {
+            OrderRequest::Trade(trade_request) => match trade_request.try_into() {
+                Ok(order) => match self.match_order(order) {
+                    Ok(trades) => trades.into_iter().map(MarketDataUpdate::Trade).collect(),
+                    Err(_) => vec![],
+                },
+                Err(_) => vec![],
+            },
+            OrderRequest::Cancel(cancel_request_type, order_id) => {
+                match self.cancel_order(cancel_request_type, order_id) {
+                    Some(cancelled_order) => vec![MarketDataUpdate::Cancellation(cancelled_order)],
+                    None => vec![],
+                }
+            }
+            OrderRequest::Modify(trade_request) => match trade_request.try_into() {
+                Ok(order) => match self.modify_order(order) {
+                    Ok((cancelled_order, trades)) => {
+                        let mut updates = vec![MarketDataUpdate::Cancellation(cancelled_order)];
+                        updates.extend(trades.into_iter().map(MarketDataUpdate::Trade));
+                        updates
+                    }
+                    Err(_) => vec![],
+                },
+                Err(_) => vec![],
+            },
+        };
+
+        if let Some(sender) = &self.market_data_update_sender {
+            for market_data_update in &market_updates {
+                sender
+                    .send(market_data_update.clone())
+                    .expect("Should never fail to send market update");
+            }
+        }
+
+        Ok(market_updates)
+    }
+
+    fn match_order(&mut self, mut order: Order) -> Result<Vec<Trade>> {
         ORDER_COUNTER.inc();
 
         if self.orders.contains_key(&order.id) {
@@ -224,48 +276,45 @@ impl Orderbook {
     /// Doesn't modify in place, cancels, and adds new order
     ///
     /// Quantity of new order is abs(modified_new_order - old_order)
-    pub fn modify_order(&mut self, order: Order) -> Result<()> {
-        let existing_order = self.orders.get(&order.id);
+    fn modify_order(&mut self, order: Order) -> Result<(CancelledOrder, Vec<Trade>)> {
+        let existing_order = match self.orders.get(&order.id) {
+            Some(existing) => existing,
+            None => bail!("Order not found"),
+        };
 
-        match existing_order {
-            Some(existing_order) => {
-                if existing_order.type_ != order.type_ {
-                    return Ok(());
-                }
-
-                if let Some(cancelled_order) =
-                    self.cancel_order(CancelRequestType::Internal, order.id)
-                {
-                    let remaining_quantity = order
-                        .remaining_quantity
-                        .abs_diff(cancelled_order.remaining_quantity);
-
-                    let fresh_order = Order {
-                        type_: order.type_,
-                        id: order.id,
-                        side: order.side,
-                        price: order.price,
-                        initial_quantity: remaining_quantity,
-                        remaining_quantity,
-                        virtual_remaining_quantity: remaining_quantity,
-                        minimum_quantity: cancelled_order.minimum_quantity,
-                    };
-
-                    self.insert_order(fresh_order);
-                }
-            }
-            // cannot modify side
-            None => return Ok(()),
+        if existing_order.type_ != order.type_ {
+            bail!("Cannot modify order type")
         }
 
-        Ok(())
+        let cancelled_order = self
+            .cancel_order(CancelRequestType::Internal, order.id)
+            .ok_or_else(|| anyhow::anyhow!("Could not cancel order"))?;
+
+        let remaining_quantity = order
+            .remaining_quantity
+            .abs_diff(cancelled_order.order.remaining_quantity);
+
+        let fresh_order = Order {
+            type_: order.type_,
+            id: order.id,
+            side: order.side,
+            price: order.price,
+            initial_quantity: remaining_quantity,
+            remaining_quantity,
+            virtual_remaining_quantity: remaining_quantity,
+            minimum_quantity: cancelled_order.order.minimum_quantity,
+        };
+
+        let trades = self.match_order(fresh_order).unwrap_or_default();
+
+        Ok((cancelled_order, trades))
     }
 
-    pub fn cancel_order(
+    fn cancel_order(
         &mut self,
-        _cancel_request_type: CancelRequestType,
+        cancel_request_type: CancelRequestType,
         order_id: Uuid,
-    ) -> Option<Order> {
+    ) -> Option<CancelledOrder> {
         if let Some(order) = self.orders.remove(&order_id) {
             let price = order.price;
             let cancelled = match order.side {
@@ -274,7 +323,10 @@ impl Orderbook {
             };
 
             if cancelled {
-                return Some(order);
+                return Some(CancelledOrder {
+                    cancel_request_type,
+                    order,
+                });
             }
         }
 
@@ -338,7 +390,7 @@ mod tests {
 
     #[test]
     fn can_insert_order() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
         let quantity = 1;
 
@@ -352,7 +404,7 @@ mod tests {
 
     #[test]
     fn cannot_match_orders_when_ask_exceeds_bid() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
 
         let quantity = 1;
         let bid_price = 1;
@@ -386,7 +438,7 @@ mod tests {
 
     #[test]
     fn can_kill_order() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
         let quantity = 1;
 
@@ -399,7 +451,7 @@ mod tests {
 
     #[test]
     fn can_match_symmetric_opposing_orders() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
         let quantity = 1;
 
@@ -430,7 +482,7 @@ mod tests {
 
     #[test]
     fn can_partially_fill_orders() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
 
         let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 0);
@@ -460,7 +512,7 @@ mod tests {
 
     #[test]
     fn can_match_orders_with_different_prices() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let quantity = 1;
         let buy_price = 2;
         let sell_price = 1;
@@ -491,7 +543,7 @@ mod tests {
 
     #[test]
     fn can_fill_with_multiple_opposing_orders() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
 
         let buy_order_1 = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 0);
@@ -537,7 +589,7 @@ mod tests {
 
     #[test]
     fn order_not_filled_when_min_quantity_not_met() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
 
         let buy_order = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 0);
@@ -554,7 +606,7 @@ mod tests {
 
     #[test]
     fn order_filled_when_min_quantity_met() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
         let quantity = 2;
 
@@ -589,7 +641,7 @@ mod tests {
 
     #[test]
     fn resting_order_not_filled_when_min_quantity_not_met() {
-        let mut orderbook = Orderbook::new();
+        let mut orderbook = Orderbook::default();
         let price = 1;
 
         let buy_order_1 = Order::new(OrderType::Normal, OrderSide::Buy, price, 1, 5);

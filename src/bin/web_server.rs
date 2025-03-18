@@ -5,7 +5,7 @@ use crossbeam::channel::{self, Receiver};
 use order_matching_engine::{
     expiration_handler::expiration_handler::ExpirationHandler,
     metrics::register_custom_metrics,
-    orderbook::{orderbook::Orderbook, Order},
+    orderbook::orderbook::Orderbook,
     web_server::{
         endpoints::{
             cancel_order_endpoint, cancel_order_expiration_endpoint, create_order_endpoint,
@@ -16,25 +16,11 @@ use order_matching_engine::{
 };
 
 fn worker_thread(receiver: Receiver<OrderRequest>) {
-    let mut orderbook = Orderbook::new();
+    let mut orderbook = Orderbook::new(None);
 
     loop {
         if let Ok(order_request) = receiver.recv() {
-            match order_request {
-                OrderRequest::Trade(trade_request) => {
-                    if let Ok(order_request) = Order::try_from(trade_request) {
-                        let _ = orderbook.match_order(order_request);
-                    }
-                }
-                OrderRequest::Cancel(cancel_request_type, order_id) => {
-                    let _ = orderbook.cancel_order(cancel_request_type, order_id);
-                }
-                OrderRequest::Modify(trade_request) => {
-                    if let Ok(order_request) = Order::try_from(trade_request) {
-                        let _ = orderbook.modify_order(order_request);
-                    }
-                }
-            }
+            let _ = orderbook.place_trade_request(order_request);
         }
     }
 }

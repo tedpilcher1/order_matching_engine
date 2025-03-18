@@ -2,24 +2,24 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anyhow::Result;
 
+use crate::orderbook::MarketDataUpdate;
 use borsh::BorshSerialize;
 use crossbeam::channel::Receiver;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 
-use crate::orderbook::Trade;
-
 const MUTLICAST_PORT: u16 = 8888;
 
-pub struct ExposeTradeWorker {
-    trade_reciever: Receiver<Trade>,
+pub struct ExposeMarketDataWorker {
+    trade_reciever: Receiver<MarketDataUpdate>,
     socket: UdpSocket,
     addr: Ipv4Addr,
 }
 
-impl ExposeTradeWorker {
-    pub fn new(trade_reciever: Receiver<Trade>) -> Self {
-        let socket = ExposeTradeWorker::setup_socket().expect("Should be able to create socket");
+impl ExposeMarketDataWorker {
+    pub fn new(trade_reciever: Receiver<MarketDataUpdate>) -> Self {
+        let socket =
+            ExposeMarketDataWorker::setup_socket().expect("Should be able to create socket");
         Self {
             trade_reciever,
             socket,
@@ -41,7 +41,7 @@ impl ExposeTradeWorker {
         loop {
             if let Ok(trade) = self.trade_reciever.recv() {
                 let mut buffer: Vec<u8> = Vec::new();
-                if let Ok(_) = trade.serialize(&mut buffer) {
+                if trade.serialize(&mut buffer).is_ok() {
                     let _ = self.socket.send_to(&buffer, &dest_addr).await;
                 }
             }
