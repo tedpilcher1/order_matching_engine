@@ -90,8 +90,6 @@ impl Orderbook {
         };
 
         for price_level in price_levels {
-            // if can't match at price level => break from both loops
-            // if order remaining quantity == 0 => break
             if order.remaining_quantity == 0 {
                 break;
             }
@@ -290,6 +288,16 @@ mod tests {
 
     use super::*;
 
+    // TODO:
+    // Test modify order
+    // Test cancel order
+
+    fn assert_trade(trades: &Vec<Trade>, index: usize, bid: TradeInfo, ask: TradeInfo) {
+        let trade = trades.get(index).unwrap();
+        assert_eq!(trade.bid, bid);
+        assert_eq!(trade.ask, ask)
+    }
+
     fn assert_empty_book(orderbook: &Orderbook) {
         assert!(orderbook.orders.is_empty());
         assert!(orderbook.ask_levels.get_prices().is_empty());
@@ -432,20 +440,19 @@ mod tests {
         let second_trades = orderbook.match_order(sell_order).unwrap();
 
         assert!(first_trades.is_empty());
-        assert_eq!(
-            second_trades.first().unwrap(),
-            &Trade {
-                bid: TradeInfo {
-                    order_id: buy_order.id,
-                    price,
-                    quantity: 1
-                },
-                ask: TradeInfo {
-                    order_id: sell_order.id,
-                    price,
-                    quantity: 1
-                }
-            }
+        assert_trade(
+            &second_trades,
+            0,
+            TradeInfo {
+                order_id: buy_order.id,
+                price,
+                quantity: 1,
+            },
+            TradeInfo {
+                order_id: sell_order.id,
+                price,
+                quantity: 1,
+            },
         );
         assert_empty_bids(&orderbook);
         assert_book_has_order(&orderbook, &sell_order.id, &sell_order.side, &1, &price);
@@ -465,20 +472,19 @@ mod tests {
         let second_trades = orderbook.match_order(sell_order).unwrap();
 
         assert!(first_trades.is_empty());
-        assert_eq!(
-            second_trades.first().unwrap(),
-            &Trade {
-                bid: TradeInfo {
-                    order_id: buy_order.id,
-                    price: buy_price,
-                    quantity,
-                },
-                ask: TradeInfo {
-                    order_id: sell_order.id,
-                    price: sell_price,
-                    quantity,
-                }
-            }
+        assert_trade(
+            &second_trades,
+            0,
+            TradeInfo {
+                order_id: buy_order.id,
+                price: buy_price,
+                quantity,
+            },
+            TradeInfo {
+                order_id: sell_order.id,
+                price: sell_price,
+                quantity,
+            },
         );
         assert_empty_book(&orderbook);
     }
@@ -498,36 +504,34 @@ mod tests {
 
         assert!(first_trades.is_empty());
         assert!(second_trades.is_empty());
-        assert_eq!(
-            third_trades,
-            [
-                Trade {
-                    bid: TradeInfo {
-                        order_id: buy_order_1.id,
-                        price,
-                        quantity: 1
-                    },
-                    ask: TradeInfo {
-                        order_id: sell_order.id,
-                        price,
-                        quantity: 1
-                    }
-                },
-                Trade {
-                    bid: TradeInfo {
-                        order_id: buy_order_2.id,
-                        price,
-                        quantity: 2
-                    },
-                    ask: TradeInfo {
-                        order_id: sell_order.id,
-                        price,
-                        quantity: 2
-                    }
-                }
-            ]
+        assert_trade(
+            &third_trades,
+            0,
+            TradeInfo {
+                order_id: buy_order_1.id,
+                price,
+                quantity: 1,
+            },
+            TradeInfo {
+                order_id: sell_order.id,
+                price,
+                quantity: 1,
+            },
         );
-
+        assert_trade(
+            &third_trades,
+            1,
+            TradeInfo {
+                order_id: buy_order_2.id,
+                price,
+                quantity: 2,
+            },
+            TradeInfo {
+                order_id: sell_order.id,
+                price,
+                quantity: 2,
+            },
+        );
         assert_empty_book(&orderbook);
     }
 
@@ -566,20 +570,19 @@ mod tests {
         let first_trades = orderbook.match_order(buy_order).unwrap();
         let second_trades = orderbook.match_order(sell_order).unwrap();
         assert!(first_trades.is_empty());
-        assert_eq!(
-            second_trades.first().unwrap(),
-            &Trade {
-                bid: TradeInfo {
-                    order_id: buy_order.id,
-                    price,
-                    quantity,
-                },
-                ask: TradeInfo {
-                    order_id: sell_order.id,
-                    price,
-                    quantity,
-                }
-            }
+        assert_trade(
+            &second_trades,
+            0,
+            TradeInfo {
+                order_id: buy_order.id,
+                price,
+                quantity,
+            },
+            TradeInfo {
+                order_id: sell_order.id,
+                price,
+                quantity,
+            },
         );
         assert_empty_book(&orderbook)
     }
@@ -599,23 +602,20 @@ mod tests {
 
         assert!(first_trades.is_empty());
         assert!(second_trades.is_empty());
-
-        assert_eq!(
-            third_trades,
-            [Trade {
-                bid: TradeInfo {
-                    order_id: buy_order_2.id,
-                    price,
-                    quantity: 1
-                },
-                ask: TradeInfo {
-                    order_id: sell_order.id,
-                    price,
-                    quantity: 1
-                }
-            },]
+        assert_trade(
+            &third_trades,
+            0,
+            TradeInfo {
+                order_id: buy_order_2.id,
+                price,
+                quantity: 1,
+            },
+            TradeInfo {
+                order_id: sell_order.id,
+                price,
+                quantity: 1,
+            },
         );
-
         assert_book_has_order(
             &orderbook,
             &buy_order_1.id,
