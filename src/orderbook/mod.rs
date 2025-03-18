@@ -1,3 +1,4 @@
+use bincode::Encode;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -52,7 +53,7 @@ pub enum OrderSide {
     Sell,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Encode)]
 struct TradeInfo {
     order_id: Uuid,
     price: Price,
@@ -60,7 +61,7 @@ struct TradeInfo {
 }
 
 /// matched order, aggregate of bid and ask
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Encode)]
 pub struct Trade {
     bid: TradeInfo,
     ask: TradeInfo,
