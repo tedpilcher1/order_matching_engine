@@ -1,4 +1,4 @@
-use bincode::Encode;
+use borsh::BorshSerialize;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -53,7 +53,7 @@ pub enum OrderSide {
     Sell,
 }
 
-#[derive(Debug, PartialEq, Encode)]
+#[derive(Debug, PartialEq, BorshSerialize)]
 struct TradeInfo {
     order_id: Uuid,
     price: Price,
@@ -61,7 +61,7 @@ struct TradeInfo {
 }
 
 /// matched order, aggregate of bid and ask
-#[derive(Debug, PartialEq, Encode)]
+#[derive(Debug, PartialEq, BorshSerialize)]
 pub struct Trade {
     bid: TradeInfo,
     ask: TradeInfo,

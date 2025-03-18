@@ -1,10 +1,8 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anyhow::Result;
-use bincode::{
-    config::{self, Configuration},
-    encode_to_vec,
-};
+
+use borsh::BorshSerialize;
 use crossbeam::channel::Receiver;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
@@ -17,7 +15,6 @@ pub struct ExposeTradeWorker {
     trade_reciever: Receiver<Trade>,
     socket: UdpSocket,
     addr: Ipv4Addr,
-    encode_config: Configuration,
 }
 
 impl ExposeTradeWorker {
@@ -27,7 +24,6 @@ impl ExposeTradeWorker {
             trade_reciever,
             socket,
             addr: Ipv4Addr::new(239, 255, 10, 10),
-            encode_config: config::standard(),
         }
     }
 
@@ -44,8 +40,9 @@ impl ExposeTradeWorker {
         let dest_addr = SocketAddr::new(IpAddr::V4(self.addr), MUTLICAST_PORT);
         loop {
             if let Ok(trade) = self.trade_reciever.recv() {
-                if let Ok(encoded_trade) = encode_to_vec(trade, self.encode_config) {
-                    let _ = self.socket.send_to(&encoded_trade, &dest_addr).await;
+                let mut buffer: Vec<u8> = Vec::new();
+                if let Ok(_) = trade.serialize(&mut buffer) {
+                    let _ = self.socket.send_to(&buffer, &dest_addr).await;
                 }
             }
         }
