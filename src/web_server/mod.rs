@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -21,7 +21,7 @@ pub enum OrderRequest {
     Modify(TradeRequest),
 }
 
-#[derive(Deserialize, Serialize, BorshSerialize, Clone)]
+#[derive(Deserialize, Serialize, BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub enum CancelRequestType {
     Internal,
     External,

@@ -8,12 +8,12 @@ use crossbeam::channel::Receiver;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 
-const MUTLICAST_PORT: u16 = 8888;
+pub const MULTICAST_PORT: u16 = 8888;
+pub const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 255, 10, 10);
 
 pub struct ExposeMarketDataWorker {
     trade_reciever: Receiver<MarketDataUpdate>,
     socket: UdpSocket,
-    addr: Ipv4Addr,
 }
 
 impl ExposeMarketDataWorker {
@@ -23,7 +23,6 @@ impl ExposeMarketDataWorker {
         Self {
             trade_reciever,
             socket,
-            addr: Ipv4Addr::new(239, 255, 10, 10),
         }
     }
 
@@ -37,7 +36,7 @@ impl ExposeMarketDataWorker {
     }
 
     pub async fn do_work(&mut self) {
-        let dest_addr = SocketAddr::new(IpAddr::V4(self.addr), MUTLICAST_PORT);
+        let dest_addr = SocketAddr::new(IpAddr::V4(MULTICAST_ADDR), MULTICAST_PORT);
         loop {
             if let Ok(trade) = self.trade_reciever.recv() {
                 let mut buffer: Vec<u8> = Vec::new();

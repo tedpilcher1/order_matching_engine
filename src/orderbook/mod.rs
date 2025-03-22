@@ -1,4 +1,4 @@
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -10,7 +10,7 @@ pub mod orderlevels;
 type Price = i64;
 type Quantity = u64;
 
-#[derive(Copy, Clone, PartialEq, Debug, BorshSerialize)]
+#[derive(Copy, Clone, PartialEq, Debug, BorshSerialize, BorshDeserialize)]
 pub struct Order {
     pub type_: OrderType,
     pub id: Uuid,
@@ -43,19 +43,23 @@ impl Order {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Deserialize, Serialize, BorshSerialize)]
+#[derive(
+    Copy, Clone, PartialEq, Debug, Deserialize, Serialize, BorshSerialize, BorshDeserialize,
+)]
 pub enum OrderType {
     Normal,
     Kill,
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Deserialize, Serialize, BorshSerialize)]
+#[derive(
+    PartialEq, Clone, Copy, Debug, Deserialize, Serialize, BorshSerialize, BorshDeserialize,
+)]
 pub enum OrderSide {
     Buy,
     Sell,
 }
 
-#[derive(Debug, PartialEq, BorshSerialize, Clone)]
+#[derive(BorshDeserialize, Debug, PartialEq, BorshSerialize, Clone)]
 struct TradeInfo {
     order_id: Uuid,
     price: Price,
@@ -63,7 +67,7 @@ struct TradeInfo {
 }
 
 /// matched order, aggregate of bid and ask
-#[derive(Debug, PartialEq, BorshSerialize, Clone)]
+#[derive(Debug, PartialEq, BorshSerialize, BorshDeserialize, Clone)]
 pub struct Trade {
     bid: TradeInfo,
     ask: TradeInfo,
@@ -83,13 +87,13 @@ pub enum MinQuantityNotMetTypes {
     Bid,
 }
 
-#[derive(BorshSerialize, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub struct CancelledOrder {
     cancel_request_type: CancelRequestType,
     order: Order,
 }
 
-#[derive(BorshSerialize, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub enum MarketDataUpdate {
     Trade(Trade),
     Cancellation(CancelledOrder),
