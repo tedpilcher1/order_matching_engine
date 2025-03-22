@@ -16,8 +16,8 @@ use order_matching_engine::{
     },
 };
 
-fn worker_thread(receiver: Receiver<OrderRequest>, market_data_sender: Sender<MarketDataUpdate>) {
-    let mut orderbook = Orderbook::new(Some(market_data_sender));
+fn worker_thread(receiver: Receiver<OrderRequest>, _market_data_sender: Sender<MarketDataUpdate>) {
+    let mut orderbook = Orderbook::new(None);
 
     loop {
         if let Ok(order_request) = receiver.recv() {
