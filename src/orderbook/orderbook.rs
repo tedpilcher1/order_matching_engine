@@ -153,7 +153,7 @@ impl Orderbook {
 
             if let Some(opposing_orders) = opposing_orders {
                 for opposing_order_id in opposing_orders {
-                    if order.remaining_quantity == 0 {
+                    if order.virtual_remaining_quantity == 0 {
                         break;
                     }
 
@@ -162,7 +162,10 @@ impl Orderbook {
                         .get_mut(opposing_order_id)
                         .expect("Order should never be in price level but not in orders");
 
-                    let quantity = min(order.remaining_quantity, opposing_order.remaining_quantity);
+                    let quantity = min(
+                        order.virtual_remaining_quantity,
+                        opposing_order.virtual_remaining_quantity,
+                    );
 
                     if quantity < opposing_order.minimum_quantity {
                         continue;
