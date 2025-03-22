@@ -239,7 +239,6 @@ impl Orderbook {
 
             opposing_order.remaining_quantity = opposing_order.virtual_remaining_quantity;
 
-            // TODO: Can unify removal of order here with cancel order method
             if opposing_order.remaining_quantity == 0 {
                 ORDERS_FILLED_COUNTER.inc();
                 match opposing_order.side {
@@ -339,10 +338,6 @@ mod tests {
     use crate::orderbook::{Price, Quantity};
 
     use super::*;
-
-    // TODO:
-    // Test modify order
-    // Test cancel order
 
     fn assert_trade(trades: &Vec<Trade>, index: usize, bid: TradeInfo, ask: TradeInfo) {
         let trade = trades.get(index).unwrap();
