@@ -11,15 +11,14 @@ use tokio::net::UdpSocket;
 pub const MULTICAST_PORT: u16 = 8888;
 pub const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 255, 10, 10);
 
-pub struct ExposeMarketDataWorker {
+pub struct MarketDataWorker {
     trade_reciever: Receiver<MarketDataUpdate>,
     socket: UdpSocket,
 }
 
-impl ExposeMarketDataWorker {
+impl MarketDataWorker {
     pub fn new(trade_reciever: Receiver<MarketDataUpdate>) -> Self {
-        let socket =
-            ExposeMarketDataWorker::setup_socket().expect("Should be able to create socket");
+        let socket = MarketDataWorker::setup_socket().expect("Should be able to create socket");
         Self {
             trade_reciever,
             socket,
@@ -37,8 +36,10 @@ impl ExposeMarketDataWorker {
 
     pub async fn do_work(&mut self) {
         let dest_addr = SocketAddr::new(IpAddr::V4(MULTICAST_ADDR), MULTICAST_PORT);
+        println!("Waiting to recieve market data");
         loop {
             if let Ok(trade) = self.trade_reciever.recv() {
+                println!("recieved trade: {:?}", trade);
                 let mut buffer: Vec<u8> = Vec::new();
                 if trade.serialize(&mut buffer).is_ok() {
                     let _ = self.socket.send_to(&buffer, &dest_addr).await;

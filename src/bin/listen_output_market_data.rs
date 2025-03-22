@@ -1,6 +1,6 @@
 use anyhow::Result;
 use borsh::BorshDeserialize;
-use order_matching_engine::market_data_outbox::expose_trade_worker::{
+use order_matching_engine::market_data_outbox::market_data_outbox_worker::{
     MULTICAST_ADDR, MULTICAST_PORT,
 };
 use order_matching_engine::orderbook::MarketDataUpdate;

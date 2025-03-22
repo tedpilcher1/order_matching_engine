@@ -79,9 +79,7 @@ impl Orderbook {
 
         if let Some(sender) = &self.market_data_update_sender {
             for market_data_update in &market_updates {
-                sender
-                    .send(market_data_update.clone())
-                    .expect("Should never fail to send market update");
+                let _ = sender.send(market_data_update.clone());
             }
         }
 
